@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tauri + Vanilla</title>
+    <style>
+      .menubar {
+        background: #f0f0f0;
+        border-bottom: 1px solid #ccc;
+        padding: 5px 10px;
+      }
+      .menu {
+        display: inline-block;
+        position: relative;
+      }
+      .menu-title {
+        padding: 5px 10px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .menu:hover .menu-title {
+        background: #ddd;
+      }
+      .menu-dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: white;
+        border: 1px solid #ccc;
+        box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+        z-index: 1000;
+      }
+      .menu:hover .menu-dropdown {
+        display: block;
+      }
+      .menu-dropdown button {
+        display: block;
+        width: 100%;
+        padding: 8px 16px;
+        border: none;
+        background: none;
+        text-align: left;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .menu-dropdown button:hover {
+        background: #f0f0f0;
+      }
+      .container {
+        padding: 20px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="menubar">
+      <div class="menu">
+        <span class="menu-title">File</span>
+        <div class="menu-dropdown">
+          <button onclick="loadFile()">Load...</button>
+        </div>
+      </div>
+    </div>
+    <div class="container">
+      <h1>Welcome to Tauri!</h1>
+      <p class="read-the-docs">Click on the File menu to load a file</p>
+      <div id="file-info" style="margin-top: 20px; padding: 10px; background: #f0f0f0; display: none;">
+        <strong>Selected file:</strong>
+        <p id="file-path"></p>
+      </div>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

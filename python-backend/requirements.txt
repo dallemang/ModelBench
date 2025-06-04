@@ -1,0 +1,5 @@
+# Add Python dependencies here as needed
+# Example:
+# requests
+# numpy
+# pandas

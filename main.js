@@ -129,10 +129,15 @@ async function loadFile() {
             </div>
           `;
           
-          // Create class diagram
+          // Create class diagram (use deep copy to avoid interference from tree building)
           if (response.class_hierarchy && response.class_hierarchy.length > 0) {
-            console.log('Creating class diagram with hierarchy:', response.class_hierarchy);
-            createClassDiagram(response.class_hierarchy);
+            console.log('Raw response.class_hierarchy from Python:', response.class_hierarchy);
+            console.log('First root class children:', response.class_hierarchy.find(c => c.children?.length > 0));
+            
+            // Create deep copy for diagram to avoid corruption from tree building
+            const hierarchyCopy = JSON.parse(JSON.stringify(response.class_hierarchy));
+            console.log('Using hierarchy copy for diagram');
+            createClassDiagram(hierarchyCopy);
           } else {
             console.log('No class hierarchy found for diagram');
           }
@@ -283,7 +288,9 @@ function toggleNode(toggleElement) {
 
 // Function to build Cytoscape graph data from class hierarchy
 function buildCytoscapeData(hierarchy) {
-  console.log('buildCytoscapeData called with:', hierarchy);
+  console.log('=== buildCytoscapeData called ===');
+  console.log('Hierarchy input:', hierarchy);
+  console.log('Number of root nodes:', hierarchy.length);
   const nodes = [];
   const edges = [];
   const processedClasses = new Set();
@@ -291,19 +298,10 @@ function buildCytoscapeData(hierarchy) {
   // Recursively process hierarchy to collect all classes
   function processNode(node) {
     console.log('Processing node:', node.label, node.uri);
-    if (processedClasses.has(node.uri)) return;
-    processedClasses.add(node.uri);
     
-    // Add class node
-    nodes.push({
-      data: {
-        id: node.uri,
-        label: node.label,
-        type: 'class'
-      }
-    });
-    
+    // Always process children first, regardless of whether this node was already processed
     // Add subclass edges (dotted lines)
+    console.log(`Checking children for ${node.label}:`, node.children, 'length:', node.children?.length);
     if (node.children && node.children.length > 0) {
       console.log(`${node.label} has ${node.children.length} children:`, node.children.map(c => c.label));
       node.children.forEach(child => {
@@ -320,7 +318,27 @@ function buildCytoscapeData(hierarchy) {
         });
         processNode(child);
       });
+    } else {
+      console.log(`${node.label} has no children (children array:`, node.children, ')');
     }
+    
+    // Only add the node itself if not already processed
+    console.log('Already processed?', processedClasses.has(node.uri));
+    if (processedClasses.has(node.uri)) {
+      console.log('Node already processed, skipping node creation:', node.uri);
+      return;
+    }
+    processedClasses.add(node.uri);
+    console.log('Added to processed classes:', node.uri);
+    
+    // Add class node
+    nodes.push({
+      data: {
+        id: node.uri,
+        label: node.label,
+        type: 'class'
+      }
+    });
     
     // Add property edges (solid lines)
     if (node.properties && node.properties.length > 0) {
@@ -365,7 +383,8 @@ function buildCytoscapeData(hierarchy) {
 
 // Function to create and configure Cytoscape instance
 function createClassDiagram(hierarchy) {
-  console.log('createClassDiagram called with:', hierarchy);
+  console.log('=== createClassDiagram START ===');
+  console.log('createClassDiagram called with hierarchy length:', hierarchy.length);
   
   const container = document.getElementById('cytoscape-container');
   console.log('Container element:', container);

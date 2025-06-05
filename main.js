@@ -315,8 +315,6 @@ function calculateHierarchicalLayout(hierarchy) {
     Object.assign(layout, treeLayout);
   });
   
-  console.log('Custom layout calculated with radius:', circleRadius);
-  console.log('Root spacing:', minSpacing, 'Min radius needed:', minRadius);
   
   return layout;
 }
@@ -392,16 +390,12 @@ function calculateTreeLayout(rootNode, rootX, rootY, angle) {
 
 // Function to build Cytoscape graph data from class hierarchy
 function buildCytoscapeData(hierarchy) {
-  console.log('=== buildCytoscapeData called ===');
-  console.log('Hierarchy input:', hierarchy);
-  console.log('Number of root nodes:', hierarchy.length);
   const nodes = [];
   const edges = [];
   const processedClasses = new Set();
   
   // Track which nodes are roots
   const rootNodeUris = new Set(hierarchy.map(root => root.uri));
-  console.log('Root node URIs:', rootNodeUris);
   
   // Track which nodes are descendants of roots (subclass* of roots)
   const descendantOfRootUris = new Set();
@@ -415,23 +409,17 @@ function buildCytoscapeData(hierarchy) {
   
   // Mark all descendants of all roots
   hierarchy.forEach(root => markDescendants(root));
-  console.log('Descendants of roots:', descendantOfRootUris.size, 'nodes');
   
   // Calculate custom layout positions
   const layoutPositions = calculateHierarchicalLayout(hierarchy);
   
   // Recursively process hierarchy to collect all classes
   function processNode(node) {
-    console.log('Processing node:', node.label, node.uri);
-    
     // Always process children first, regardless of whether this node was already processed
     // Add subclass edges (dotted lines)
-    console.log(`Checking children for ${node.label}:`, node.children, 'length:', node.children?.length);
     if (node.children && node.children.length > 0) {
-      console.log(`${node.label} has ${node.children.length} children:`, node.children.map(c => c.label));
       node.children.forEach(child => {
         const edgeId = `subclass_${child.uri}_${node.uri}`;
-        console.log(`Creating subclass edge: ${child.label} -> ${node.label} (${edgeId})`);
         edges.push({
           data: {
             id: edgeId,
@@ -443,18 +431,13 @@ function buildCytoscapeData(hierarchy) {
         });
         processNode(child);
       });
-    } else {
-      console.log(`${node.label} has no children (children array:`, node.children, ')');
     }
     
     // Only add the node itself if not already processed
-    console.log('Already processed?', processedClasses.has(node.uri));
     if (processedClasses.has(node.uri)) {
-      console.log('Node already processed, skipping node creation:', node.uri);
       return;
     }
     processedClasses.add(node.uri);
-    console.log('Added to processed classes:', node.uri);
     
     // Add class node with custom position
     const position = layoutPositions[node.uri] || { x: 0, y: 0 };
@@ -479,12 +462,6 @@ function buildCytoscapeData(hierarchy) {
       },
       position: position
     });
-    
-    if (nodeCategory === 'root') {
-      console.log('Created ROOT node:', node.label, 'at position:', position);
-    } else if (nodeCategory === 'orphaned') {
-      console.log('Created ORPHANED node:', node.label, 'at position:', position);
-    }
     
     // Add property edges (solid lines)
     if (node.properties && node.properties.length > 0) {
@@ -526,10 +503,6 @@ function buildCytoscapeData(hierarchy) {
               position: position
             });
             processedClasses.add(range.uri);
-            
-            if (nodeCategory === 'orphaned') {
-              console.log('Created ORPHANED range node:', range.label, 'at position:', position);
-            }
           }
         });
       });
@@ -539,20 +512,12 @@ function buildCytoscapeData(hierarchy) {
   // Process all root nodes
   hierarchy.forEach(processNode);
   
-  console.log('Final edges created:', edges.length);
-  console.log('Subclass edges:', edges.filter(e => e.data.type === 'subclass').length);
-  console.log('Property edges:', edges.filter(e => e.data.type === 'property').length);
-  
   return { nodes, edges };
 }
 
 // Function to create and configure Cytoscape instance
 function createClassDiagram(hierarchy) {
-  console.log('=== createClassDiagram START ===');
-  console.log('createClassDiagram called with hierarchy length:', hierarchy.length);
-  
   const container = document.getElementById('cytoscape-container');
-  console.log('Container element:', container);
   
   if (!container) {
     console.error('Cytoscape container not found!');
@@ -571,13 +536,6 @@ function createClassDiagram(hierarchy) {
   }
   
   const { nodes, edges } = buildCytoscapeData(hierarchy);
-  console.log('Built cytoscape data:', { nodes: nodes.length, edges: edges.length });
-  
-  // Log all data for inspection
-  console.log('=== CYTOSCAPE DATA DUMP ===');
-  console.log('Nodes:', nodes);
-  console.log('Edges:', edges);
-  console.log('=== END DATA DUMP ===');
   
   cytoscapeInstance = cytoscape({
     container: container,
@@ -696,14 +654,11 @@ function createClassDiagram(hierarchy) {
   
   // Fit to container after layout
   cytoscapeInstance.ready(() => {
-    console.log('Cytoscape ready, fitting to screen');
     setTimeout(() => {
       cytoscapeInstance.fit();
       cytoscapeInstance.center();
     }, 100);
   });
-  
-  console.log('Cytoscape instance created:', cytoscapeInstance);
 }
 
 // Function to reset diagram layout
@@ -720,16 +675,6 @@ function resetDiagramLayout() {
 // Function to fit diagram to screen
 function fitDiagram() {
   if (cytoscapeInstance) {
-    console.log('Fitting diagram to screen');
-    console.log('Number of nodes:', cytoscapeInstance.nodes().length);
-    console.log('Number of edges:', cytoscapeInstance.edges().length);
-    
-    // Check if nodes have positions
-    const firstNode = cytoscapeInstance.nodes().first();
-    if (firstNode.length > 0) {
-      console.log('First node position:', firstNode.position());
-    }
-    
     cytoscapeInstance.fit();
     cytoscapeInstance.center();
     
@@ -737,12 +682,6 @@ function fitDiagram() {
     const currentZoom = cytoscapeInstance.zoom();
     cytoscapeInstance.zoom(currentZoom * 0.9);
     cytoscapeInstance.center();
-    
-    console.log('Adjusted zoom level:', cytoscapeInstance.zoom());
-    
-    // Get the bounding box
-    const bb = cytoscapeInstance.nodes().boundingBox();
-    console.log('Nodes bounding box:', bb);
   }
 }
 
@@ -770,7 +709,6 @@ function switchTab(tabName) {
     
     if (cytoscapeInstance) {
       setTimeout(() => {
-        console.log('Tab switched to diagram, resizing and fitting...');
         cytoscapeInstance.resize();
         fitDiagram();
       }, 300);

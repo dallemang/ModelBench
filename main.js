@@ -286,6 +286,110 @@ function toggleNode(toggleElement) {
   }
 }
 
+// Function to calculate custom hierarchical layout positions
+function calculateHierarchicalLayout(hierarchy) {
+  const layout = {};
+  const nodeWidth = 100;     // Width of a node (for spacing calculations)
+  const minSpacing = 150;    // Minimum distance between adjacent roots
+  
+  // Calculate minimum radius needed to prevent root overlap
+  // Circumference needed = numRoots * minSpacing
+  // Radius = Circumference / (2 * π)
+  const minRadius = (hierarchy.length * minSpacing) / (2 * Math.PI);
+  const circleRadius = Math.max(120, minRadius); // At least 120px radius
+  
+  const centerX = 0;         // Center of the circle
+  const centerY = 0;         // Center of the circle
+  
+  // Calculate positions for each root around the circle
+  const angleStep = (2 * Math.PI) / hierarchy.length;
+  
+  hierarchy.forEach((rootNode, index) => {
+    // Calculate root position on the circle
+    const angle = index * angleStep - (Math.PI / 2); // Start at top (subtract π/2)
+    const rootX = centerX + circleRadius * Math.cos(angle);
+    const rootY = centerY + circleRadius * Math.sin(angle);
+    
+    // Calculate tree layout with root at this position
+    const treeLayout = calculateTreeLayout(rootNode, rootX, rootY, angle);
+    Object.assign(layout, treeLayout);
+  });
+  
+  console.log('Custom layout calculated with radius:', circleRadius);
+  console.log('Root spacing:', minSpacing, 'Min radius needed:', minRadius);
+  
+  return layout;
+}
+
+// Function to calculate layout for a single tree
+function calculateTreeLayout(rootNode, rootX, rootY, angle) {
+  const positions = {};
+  const nodeWidth = 150;
+  const layerHeight = 120;
+  
+  // Calculate direction vector - trees grow AWAY from center (outward)
+  const directionX = Math.cos(angle); // Away from center
+  const directionY = Math.sin(angle); // Away from center
+  
+  // Calculate perpendicular vector for horizontal spreading of children
+  const perpX = -directionY; // Perpendicular to direction
+  const perpY = directionX;
+  
+  // First pass: calculate subtree widths (how much horizontal space each subtree needs)
+  function calculateSubtreeWidth(node) {
+    if (!node.children || node.children.length === 0) {
+      return 1; // Leaf node takes one unit width
+    }
+    
+    // Sum up the widths of all children subtrees
+    const childrenWidth = node.children.reduce((total, child) => {
+      return total + calculateSubtreeWidth(child);
+    }, 0);
+    
+    return Math.max(1, childrenWidth); // At least one unit width, or sum of children
+  }
+  
+  // Second pass: assign positions based on subtree widths
+  function assignPositions(node, centerX, centerY, level, availableWidth) {
+    // Position this node at its center
+    positions[node.uri] = { x: centerX, y: centerY };
+    
+    if (node.children && node.children.length > 0) {
+      // Calculate positions for children
+      const childLevel = level + 1;
+      const childCenterX = centerX + directionX * layerHeight;
+      const childCenterY = centerY + directionY * layerHeight;
+      
+      // Calculate total width needed for all children
+      const totalChildWidth = node.children.reduce((total, child) => {
+        return total + calculateSubtreeWidth(child);
+      }, 0);
+      
+      // Start position for children (leftmost)
+      const startOffset = (totalChildWidth - 1) * nodeWidth / 2;
+      let currentOffset = -startOffset;
+      
+      node.children.forEach(child => {
+        const childSubtreeWidth = calculateSubtreeWidth(child);
+        const childOffset = currentOffset + (childSubtreeWidth - 1) * nodeWidth / 2;
+        
+        const childX = childCenterX + perpX * childOffset;
+        const childY = childCenterY + perpY * childOffset;
+        
+        assignPositions(child, childX, childY, childLevel, childSubtreeWidth);
+        
+        currentOffset += childSubtreeWidth * nodeWidth;
+      });
+    }
+  }
+  
+  // Start positioning from the root
+  const rootSubtreeWidth = calculateSubtreeWidth(rootNode);
+  assignPositions(rootNode, rootX, rootY, 0, rootSubtreeWidth);
+  
+  return positions;
+}
+
 // Function to build Cytoscape graph data from class hierarchy
 function buildCytoscapeData(hierarchy) {
   console.log('=== buildCytoscapeData called ===');
@@ -294,6 +398,27 @@ function buildCytoscapeData(hierarchy) {
   const nodes = [];
   const edges = [];
   const processedClasses = new Set();
+  
+  // Track which nodes are roots
+  const rootNodeUris = new Set(hierarchy.map(root => root.uri));
+  console.log('Root node URIs:', rootNodeUris);
+  
+  // Track which nodes are descendants of roots (subclass* of roots)
+  const descendantOfRootUris = new Set();
+  
+  function markDescendants(node) {
+    descendantOfRootUris.add(node.uri);
+    if (node.children) {
+      node.children.forEach(child => markDescendants(child));
+    }
+  }
+  
+  // Mark all descendants of all roots
+  hierarchy.forEach(root => markDescendants(root));
+  console.log('Descendants of roots:', descendantOfRootUris.size, 'nodes');
+  
+  // Calculate custom layout positions
+  const layoutPositions = calculateHierarchicalLayout(hierarchy);
   
   // Recursively process hierarchy to collect all classes
   function processNode(node) {
@@ -331,14 +456,35 @@ function buildCytoscapeData(hierarchy) {
     processedClasses.add(node.uri);
     console.log('Added to processed classes:', node.uri);
     
-    // Add class node
+    // Add class node with custom position
+    const position = layoutPositions[node.uri] || { x: 0, y: 0 };
+    const isRoot = rootNodeUris.has(node.uri);
+    const isDescendant = descendantOfRootUris.has(node.uri);
+    
+    let nodeCategory;
+    if (isRoot) {
+      nodeCategory = 'root';
+    } else if (isDescendant) {
+      nodeCategory = 'descendant';
+    } else {
+      nodeCategory = 'orphaned';
+    }
+    
     nodes.push({
       data: {
         id: node.uri,
         label: node.label,
-        type: 'class'
-      }
+        type: 'class',
+        category: nodeCategory
+      },
+      position: position
     });
+    
+    if (nodeCategory === 'root') {
+      console.log('Created ROOT node:', node.label, 'at position:', position);
+    } else if (nodeCategory === 'orphaned') {
+      console.log('Created ORPHANED node:', node.label, 'at position:', position);
+    }
     
     // Add property edges (solid lines)
     if (node.properties && node.properties.length > 0) {
@@ -357,14 +503,33 @@ function buildCytoscapeData(hierarchy) {
           
           // Ensure range class is included as a node if not already processed
           if (!processedClasses.has(range.uri)) {
+            const position = layoutPositions[range.uri] || { x: Math.random() * 400 - 200, y: Math.random() * 200 + 300 };
+            const isRoot = rootNodeUris.has(range.uri);
+            const isDescendant = descendantOfRootUris.has(range.uri);
+            
+            let nodeCategory;
+            if (isRoot) {
+              nodeCategory = 'root';
+            } else if (isDescendant) {
+              nodeCategory = 'descendant';
+            } else {
+              nodeCategory = 'orphaned';
+            }
+            
             nodes.push({
               data: {
                 id: range.uri,
                 label: range.label,
-                type: 'class'
-              }
+                type: 'class',
+                category: nodeCategory
+              },
+              position: position
             });
             processedClasses.add(range.uri);
+            
+            if (nodeCategory === 'orphaned') {
+              console.log('Created ORPHANED range node:', range.label, 'at position:', position);
+            }
           }
         });
       });
@@ -418,9 +583,31 @@ function createClassDiagram(hierarchy) {
     container: container,
     elements: [...nodes, ...edges],
     style: [
-      // Class nodes (bubbles)
+      // Root class nodes (green bubbles)
       {
-        selector: 'node[type="class"]',
+        selector: 'node[type="class"][category="root"]',
+        style: {
+          'background-color': '#28A745',
+          'color': 'white',
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '12px',
+          'font-weight': 'bold',
+          'text-wrap': 'wrap',
+          'text-max-width': '100px',
+          'width': '80px',
+          'height': '80px',
+          'shape': 'ellipse',
+          'border-width': '3px',
+          'border-color': '#1E7E34',
+          'text-outline-width': '1px',
+          'text-outline-color': '#1E7E34'
+        }
+      },
+      // Descendant class nodes (blue bubbles)
+      {
+        selector: 'node[type="class"][category="descendant"]',
         style: {
           'background-color': '#4A90E2',
           'color': 'white',
@@ -438,6 +625,28 @@ function createClassDiagram(hierarchy) {
           'border-color': '#2E5A87',
           'text-outline-width': '1px',
           'text-outline-color': '#2E5A87'
+        }
+      },
+      // Orphaned class nodes (dusty pink bubbles)
+      {
+        selector: 'node[type="class"][category="orphaned"]',
+        style: {
+          'background-color': '#D8A7CA',
+          'color': 'black',
+          'label': 'data(label)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'font-size': '12px',
+          'font-weight': 'bold',
+          'text-wrap': 'wrap',
+          'text-max-width': '100px',
+          'width': '80px',
+          'height': '80px',
+          'shape': 'ellipse',
+          'border-width': '2px',
+          'border-color': '#B85C91',
+          'text-outline-width': '1px',
+          'text-outline-color': '#B85C91'
         }
       },
       // Subclass edges (dotted lines)
@@ -476,19 +685,9 @@ function createClassDiagram(hierarchy) {
       }
     ],
     layout: {
-      name: 'cose',
+      name: 'preset',
       animate: true,
-      animationDuration: 1000,
-      nodeRepulsion: 8000,
-      nodeOverlap: 20,
-      idealEdgeLength: 100,
-      edgeElasticity: 100,
-      nestingFactor: 5,
-      gravity: 80,
-      numIter: 1000,
-      initialTemp: 200,
-      coolingFactor: 0.95,
-      minTemp: 1.0
+      animationDuration: 1000
     },
     wheelSensitivity: 0.1,
     minZoom: 0.1,
@@ -511,19 +710,9 @@ function createClassDiagram(hierarchy) {
 function resetDiagramLayout() {
   if (cytoscapeInstance) {
     cytoscapeInstance.layout({
-      name: 'cose',
+      name: 'preset',
       animate: true,
-      animationDuration: 1000,
-      nodeRepulsion: 8000,
-      nodeOverlap: 20,
-      idealEdgeLength: 100,
-      edgeElasticity: 100,
-      nestingFactor: 5,
-      gravity: 80,
-      numIter: 1000,
-      initialTemp: 200,
-      coolingFactor: 0.95,
-      minTemp: 1.0
+      animationDuration: 1000
     }).run();
   }
 }

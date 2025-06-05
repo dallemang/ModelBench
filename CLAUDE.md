@@ -28,7 +28,24 @@ npm run build             # Build frontend only
 ### Setup
 ```bash
 npm install                           # Install Node.js dependencies
-cd python-backend && pip install -r requirements.txt  # Setup Python environment
+```
+
+#### Python Virtual Environment Setup (Windows)
+```powershell
+# Run the setup script to create venv and install dependencies
+.\setup-python.bat
+
+# Or manually:
+python -m venv python-backend\venv
+python-backend\venv\Scripts\activate
+pip install -r python-backend\requirements.txt
+```
+
+#### Python Virtual Environment Setup (Linux/Mac)
+```bash
+python -m venv python-backend/venv
+source python-backend/venv/bin/activate
+pip install -r python-backend/requirements.txt
 ```
 
 ## Architecture Details

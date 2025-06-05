@@ -5,6 +5,7 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tauri + Vanilla</title>
+    <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
     <style>
       .menubar {
         background: #f0f0f0;
@@ -52,6 +53,256 @@
       .container {
         padding: 20px;
       }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 10px;
+        margin: 10px 0;
+      }
+      .stats-grid > div {
+        padding: 8px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        border-left: 3px solid #007bff;
+      }
+      .namespaces, .classes, .properties {
+        max-height: 200px;
+        overflow-y: auto;
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 5px 0;
+      }
+      .namespaces > div, .classes > div, .properties > div {
+        margin: 2px 0;
+        font-family: monospace;
+        font-size: 12px;
+      }
+      code {
+        background: #e9ecef;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-family: 'Courier New', monospace;
+      }
+      #graph-stats {
+        margin-top: 15px;
+        padding: 15px;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+      }
+      .class-hierarchy {
+        margin-top: 15px;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        padding: 15px;
+      }
+      .tree {
+        font-family: monospace;
+        font-size: 14px;
+      }
+      .tree-node {
+        margin: 2px 0;
+        user-select: none;
+      }
+      .tree-toggle {
+        display: inline-block;
+        width: 16px;
+        cursor: pointer;
+        color: #666;
+      }
+      .tree-toggle:hover {
+        color: #000;
+      }
+      .tree-label {
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: 3px;
+      }
+      .tree-label:hover {
+        background: #f0f0f0;
+      }
+      .tree-children {
+        margin-left: 20px;
+      }
+      .tree-children.collapsed {
+        display: none;
+      }
+      .tree-uri {
+        color: #666;
+        font-size: 12px;
+        margin-left: 20px;
+      }
+      
+      /* Tab Styles */
+      .tab-container {
+        margin-top: 20px;
+      }
+      .tab-nav {
+        display: flex;
+        border-bottom: 2px solid #ddd;
+        margin-bottom: 0;
+      }
+      .tab-button {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-bottom: none;
+        padding: 12px 24px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        margin-right: 2px;
+        border-radius: 6px 6px 0 0;
+        transition: all 0.2s ease;
+      }
+      .tab-button:hover {
+        background: #e9ecef;
+      }
+      .tab-button.active {
+        background: #fff;
+        border-bottom: 2px solid #fff;
+        margin-bottom: -2px;
+        color: #007bff;
+        font-weight: 600;
+      }
+      .tab-content {
+        background: #fff;
+        border: 1px solid #ddd;
+        border-top: none;
+        min-height: 300px;
+      }
+      .tab-content.diagram-active {
+        height: calc(100vh - 180px);
+        min-height: 600px;
+      }
+      .tab-pane {
+        display: none;
+        padding: 20px;
+      }
+      .tab-pane.active {
+        display: block;
+      }
+      .class-hierarchy {
+        margin: 0;
+        background: transparent;
+        border: none;
+        padding: 0;
+      }
+      
+      /* Split Panel Layout */
+      .split-panel {
+        display: flex;
+        height: 600px;
+        gap: 20px;
+      }
+      .left-panel {
+        flex: 1;
+        border-right: 1px solid #ddd;
+        padding-right: 20px;
+        overflow-y: auto;
+      }
+      .right-panel {
+        flex: 1;
+        padding-left: 20px;
+        overflow-y: auto;
+      }
+      
+      /* Class Details Panel */
+      #class-details {
+        height: 100%;
+      }
+      .no-selection {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #666;
+        font-style: italic;
+      }
+      .class-form {
+        display: none;
+      }
+      .class-form.active {
+        display: block;
+      }
+      .class-form h2 {
+        margin-top: 0;
+        color: #333;
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 10px;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      .form-group label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 5px;
+        color: #555;
+      }
+      .form-group .property-values {
+        background: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 8px 12px;
+        min-height: 20px;
+        font-family: monospace;
+        font-size: 14px;
+      }
+      .form-group .property-values.empty {
+        color: #999;
+        font-style: italic;
+        font-family: inherit;
+      }
+      
+      /* Tree node selection styling */
+      .tree-label.selected {
+        background: #007bff;
+        color: white;
+        font-weight: 600;
+      }
+      
+      /* Class Diagram Styles */
+      #class-diagram-container {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      #diagram-toolbar {
+        padding: 10px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        gap: 10px;
+      }
+      #diagram-toolbar button {
+        padding: 6px 12px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      #diagram-toolbar button:hover {
+        background: #0056b3;
+      }
+      #cytoscape-container {
+        flex: 1;
+        height: 100%;
+        min-height: 500px;
+        background: #fff;
+        border: 1px solid #ddd;
+      }
+      .tab-pane.diagram-active {
+        height: calc(100vh - 180px);
+        min-height: 600px;
+        padding: 0;
+      }
+      .tab-pane.diagram-active #class-diagram-container {
+        height: 100%;
+      }
     </style>
   </head>
 
@@ -65,11 +316,50 @@
       </div>
     </div>
     <div class="container">
-      <h1>Welcome to Tauri!</h1>
-      <p class="read-the-docs">Click on the File menu to load a file</p>
-      <div id="file-info" style="margin-top: 20px; padding: 10px; background: #f0f0f0; display: none;">
-        <strong>Selected file:</strong>
-        <p id="file-path"></p>
+      <!-- Tab Navigation -->
+      <div class="tab-container" id="tab-container" style="display: none;">
+        <div class="tab-nav">
+          <button class="tab-button active" onclick="switchTab('hierarchy')">Class Hierarchy</button>
+          <button class="tab-button" onclick="switchTab('diagram')">Class Diagram</button>
+          <button class="tab-button" onclick="switchTab('log')">Log</button>
+        </div>
+        
+        <!-- Tab Content -->
+        <div class="tab-content">
+          <!-- Hierarchy Tab -->
+          <div id="tab-hierarchy" class="tab-pane active">
+            <div class="split-panel">
+              <div class="left-panel">
+                <h3>Class Hierarchy</h3>
+                <div id="hierarchy-tree" class="tree"></div>
+              </div>
+              <div class="right-panel">
+                <div id="class-details">
+                  <div class="no-selection">
+                    <p>Select a class from the hierarchy to view its details</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Class Diagram Tab -->
+          <div id="tab-diagram" class="tab-pane">
+            <div id="class-diagram-container">
+              <div id="diagram-toolbar">
+                <button onclick="resetDiagramLayout()">Reset Layout</button>
+                <button onclick="fitDiagram()">Fit to Screen</button>
+                <button onclick="debugDiagramData()">Debug Data</button>
+              </div>
+              <div id="cytoscape-container"></div>
+            </div>
+          </div>
+          
+          <!-- Log Tab -->
+          <div id="tab-log" class="tab-pane">
+            <div id="graph-stats"></div>
+          </div>
+        </div>
       </div>
     </div>
 

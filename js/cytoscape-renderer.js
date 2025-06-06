@@ -5,7 +5,6 @@
 import { buildCytoscapeData } from './cytoscape-builder.js';
 
 // Global Cytoscape instance
-
 let cytoscapeInstance = null;
 
 /**
@@ -14,6 +13,8 @@ let cytoscapeInstance = null;
  * @returns {Object} Cytoscape instance or null if failed
  */
 export function createClassDiagram(hierarchy) {
+  console.log('createClassDiagram called with hierarchy:', hierarchy.length, 'nodes');
+  
   const container = document.getElementById('cytoscape-container');
   
   if (!container) {
@@ -29,24 +30,34 @@ export function createClassDiagram(hierarchy) {
   
   // Clear existing instance
   if (cytoscapeInstance) {
+    console.log('Destroying existing cytoscape instance');
     cytoscapeInstance.destroy();
+    cytoscapeInstance = null;
+    console.log('Instance set to null after destroy');
   }
   
   const { nodes, edges } = buildCytoscapeData(hierarchy);
+  console.log('Building cytoscape with', nodes.length, 'nodes and', edges.length, 'edges');
   
-  cytoscapeInstance = cytoscape({
-    container: container,
-    elements: [...nodes, ...edges],
-    style: getCytoscapeStyle(),
-    layout: {
-      name: 'preset',
-      animate: true,
-      animationDuration: 1000
-    },
-    wheelSensitivity: 0.1,
-    minZoom: 0.1,
-    maxZoom: 3
-  });
+  try {
+    cytoscapeInstance = cytoscape({
+      container: container,
+      elements: [...nodes, ...edges],
+      style: getCytoscapeStyle(),
+      layout: {
+        name: 'preset',
+        animate: true,
+        animationDuration: 1000
+      },
+      wheelSensitivity: 0.1,
+      minZoom: 0.1,
+      maxZoom: 3
+    });
+  } catch (error) {
+    console.error('Error creating cytoscape instance:', error);
+    cytoscapeInstance = null;
+    return null;
+  }
   
   // Fit to container after layout
   cytoscapeInstance.ready(() => {
@@ -56,6 +67,14 @@ export function createClassDiagram(hierarchy) {
     }, 100);
   });
   
+  console.log('Cytoscape instance created successfully:', !!cytoscapeInstance);
+  console.log('Instance stored in module variable:', cytoscapeInstance === null ? 'NULL' : 'EXISTS');
+  
+  // Test immediate access
+  setTimeout(() => {
+    console.log('Testing instance access after 100ms:', !!cytoscapeInstance);
+  }, 100);
+  
   return cytoscapeInstance;
 }
 
@@ -64,6 +83,7 @@ export function createClassDiagram(hierarchy) {
  * @returns {Object|null} Current Cytoscape instance
  */
 export function getCytoscapeInstance() {
+  console.log('getCytoscapeInstance called, returning:', !!cytoscapeInstance);
   return cytoscapeInstance;
 }
 

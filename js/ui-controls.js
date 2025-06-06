@@ -30,11 +30,16 @@ export function switchTab(tabName) {
     document.querySelector('.tab-content').classList.add('diagram-active');
     
     const cytoscapeInstance = getCytoscapeInstance();
+    console.log('Switching to diagram tab, cytoscape instance:', cytoscapeInstance);
     if (cytoscapeInstance) {
       setTimeout(() => {
+        console.log('Resizing and fitting diagram...');
         cytoscapeInstance.resize();
         fitDiagram();
+        console.log('Resize and fit complete');
       }, 300);
+    } else {
+      console.log('No cytoscape instance found!');
     }
   }
 }

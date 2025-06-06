@@ -183,23 +183,23 @@ document.addEventListener('DOMContentLoaded', () => {
 if (import.meta.hot) {
   // Force full reload when any of our modules change
   import.meta.hot.accept('./js/cytoscape-renderer.js', () => {
-    console.log('Cytoscape renderer module updated - reloading');
+    console.log('HMR: Cytoscape renderer module updated - reloading');
     window.location.reload();
   });
   import.meta.hot.accept('./js/ui-controls.js', () => {
-    console.log('UI controls module updated - reloading');
+    console.log('HMR: UI controls module updated - reloading');
     window.location.reload();
   });
   import.meta.hot.accept('./js/tree-builder.js', () => {
-    console.log('Tree builder module updated - reloading');
+    console.log('HMR: Tree builder module updated - reloading');
     window.location.reload();
   });
   import.meta.hot.accept('./js/layout.js', () => {
-    console.log('Layout module updated - reloading');
+    console.log('HMR: Layout module updated - reloading');
     window.location.reload();
   });
   import.meta.hot.accept('./js/cytoscape-builder.js', () => {
-    console.log('Cytoscape builder module updated - reloading');
+    console.log('HMR: Cytoscape builder module updated - reloading');
     window.location.reload();
   });
 }

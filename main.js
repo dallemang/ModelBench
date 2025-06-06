@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { createClassDiagram } from './js/cytoscape-renderer.js';
-import { switchTab, resetLayout, fitToScreen, debugDiagramData } from './js/ui-controls.js';
+import { switchTab, resetLayout, fitToScreen, debugDiagramData, toggleLayoutType, setHierarchyData, getCurrentLayoutType } from './js/ui-controls.js';
 import { buildTreeHtml, selectClass, toggleNode, setTreeState, getClassData, getNamespaces } from './js/tree-builder.js';
 
 // Helper function to render import details recursively
@@ -187,7 +187,13 @@ async function loadFile() {
           if (response.class_hierarchy && response.class_hierarchy.length > 0) {
             // Create deep copy for diagram to avoid corruption from tree building
             const hierarchyCopy = JSON.parse(JSON.stringify(response.class_hierarchy));
-            createClassDiagram(hierarchyCopy);
+            
+            // Store hierarchy data for layout switching
+            setHierarchyData(hierarchyCopy);
+            
+            // Create diagram with current layout type
+            const layoutType = getCurrentLayoutType();
+            createClassDiagram(hierarchyCopy, layoutType);
           }
           
           // Ensure we start on the hierarchy tab
@@ -218,6 +224,7 @@ window.selectClass = selectClass;
 window.resetDiagramLayout = resetLayout;
 window.fitDiagram = fitToScreen;
 window.debugDiagramData = debugDiagramData;
+window.toggleLayoutType = toggleLayoutType;
 
 // Expose state functions for debugging
 window.getClassData = getClassData;

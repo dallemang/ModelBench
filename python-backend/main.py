@@ -175,12 +175,18 @@ def build_class_hierarchy_from_dataset(dataset):
     # Build hierarchy entries for all classes
     for cls in all_classes:
         cls_str = str(cls)
-        # Find the best label from any graph
+        # Find the best label and identify source graph
         label = None
         properties = []
+        graph_source = None
+        
         for graph in dataset.graphs():
-            if label is None:
-                label = get_label(graph, cls)
+            # Check if this class is defined in this graph
+            if (cls, RDF.type, OWL.Class) in graph or (cls, RDF.type, RDFS.Class) in graph:
+                if graph_source is None:
+                    graph_source = str(graph.identifier)
+                if label is None:
+                    label = get_label(graph, cls)
             # Collect properties from all graphs
             properties.extend(get_class_properties(graph, cls_str))
         
@@ -188,7 +194,8 @@ def build_class_hierarchy_from_dataset(dataset):
             "uri": cls_str,
             "label": label or cls_str.split('#')[-1].split('/')[-1],
             "children": [],
-            "properties": properties
+            "properties": properties,
+            "graph_source": graph_source or "unknown"
         }
     
     # Second pass: collect subclass relationships from all graphs

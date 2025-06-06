@@ -2,7 +2,7 @@
  * UI interaction handlers and controls
  */
 
-import { getCytoscapeInstance, resetDiagramLayout, fitDiagram } from './cytoscape-renderer.js';
+import { getCytoscapeInstance, resetDiagramLayout, fitDiagram, createClassDiagram } from './cytoscape-renderer.js';
 
 /**
  * Switch between tabs
@@ -70,6 +70,7 @@ export function debugDiagramData() {
   
   console.log('Class Data:', classData);
   console.log('Namespaces:', namespaces);
+  console.log('Current Layout Type:', window.currentLayoutType || 'rings');
   
   const cytoscapeInstance = getCytoscapeInstance();
   if (cytoscapeInstance) {
@@ -79,4 +80,54 @@ export function debugDiagramData() {
     console.log('No Cytoscape instance found');
   }
   console.log('=== END DEBUG INFO ===');
+}
+
+// Global state for layout type
+let currentLayoutType = 'rings';
+let currentHierarchyData = null;
+
+/**
+ * Toggle between ring and traditional layout types
+ */
+export function toggleLayoutType() {
+  // Toggle layout type
+  currentLayoutType = currentLayoutType === 'rings' ? 'traditional' : 'rings';
+  
+  // Update button text
+  const button = document.querySelector('button[onclick="toggleLayoutType()"]');
+  if (button) {
+    button.textContent = currentLayoutType === 'rings' 
+      ? 'Switch to Traditional Layout' 
+      : 'Switch to Ring Layout';
+  }
+  
+  // Recreate diagram with new layout if we have data
+  if (currentHierarchyData) {
+    console.log('Switching to', currentLayoutType, 'layout');
+    createClassDiagram(currentHierarchyData, currentLayoutType);
+    
+    // Fit the diagram after a short delay
+    setTimeout(() => {
+      fitDiagram();
+    }, 500);
+  }
+  
+  // Store globally for access
+  window.currentLayoutType = currentLayoutType;
+}
+
+/**
+ * Store hierarchy data for layout switching
+ * @param {Array} hierarchyData - The hierarchy data
+ */
+export function setHierarchyData(hierarchyData) {
+  currentHierarchyData = hierarchyData;
+}
+
+/**
+ * Get current layout type
+ * @returns {string} Current layout type
+ */
+export function getCurrentLayoutType() {
+  return currentLayoutType;
 }

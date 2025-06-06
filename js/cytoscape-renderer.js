@@ -3,6 +3,7 @@
  */
 
 import { buildCytoscapeData } from './cytoscape-builder.js';
+import { buildCytoscapeDataWithRings } from './cytoscape-ring-builder.js';
 
 // Global Cytoscape instance
 let cytoscapeInstance = null;
@@ -10,9 +11,10 @@ let cytoscapeInstance = null;
 /**
  * Create and configure Cytoscape instance
  * @param {Array} hierarchy - Class hierarchy data
+ * @param {string} layoutType - Layout type: 'traditional' or 'rings'
  * @returns {Object} Cytoscape instance or null if failed
  */
-export function createClassDiagram(hierarchy) {
+export function createClassDiagram(hierarchy, layoutType = 'rings') {
   console.log('createClassDiagram called with hierarchy:', hierarchy.length, 'nodes');
   
   const container = document.getElementById('cytoscape-container');
@@ -36,8 +38,20 @@ export function createClassDiagram(hierarchy) {
     console.log('Instance set to null after destroy');
   }
   
-  const { nodes, edges } = buildCytoscapeData(hierarchy);
-  console.log('Building cytoscape with', nodes.length, 'nodes and', edges.length, 'edges');
+  // Choose the appropriate builder based on layout type
+  let graphData;
+  if (layoutType === 'rings') {
+    graphData = buildCytoscapeDataWithRings(hierarchy);
+    console.log('Building cytoscape with ring layout:', graphData.nodes.length, 'nodes and', graphData.edges.length, 'edges');
+    if (graphData.graphNodes) {
+      console.log('Ring layout organized', Object.keys(graphData.graphNodes).length, 'graphs:', Object.keys(graphData.graphNodes));
+    }
+  } else {
+    graphData = buildCytoscapeData(hierarchy);
+    console.log('Building cytoscape with traditional layout:', graphData.nodes.length, 'nodes and', graphData.edges.length, 'edges');
+  }
+  
+  const { nodes, edges } = graphData;
   
   try {
     cytoscapeInstance = cytoscape({

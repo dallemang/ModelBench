@@ -67,13 +67,6 @@ export function createClassDiagram(hierarchy) {
     }, 100);
   });
   
-  console.log('Cytoscape instance created successfully:', !!cytoscapeInstance);
-  console.log('Instance stored in module variable:', cytoscapeInstance === null ? 'NULL' : 'EXISTS');
-  
-  // Test immediate access
-  setTimeout(() => {
-    console.log('Testing instance access after 100ms:', !!cytoscapeInstance);
-  }, 100);
   
   return cytoscapeInstance;
 }

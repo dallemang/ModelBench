@@ -4,6 +4,38 @@ import { createClassDiagram } from './js/cytoscape-renderer.js';
 import { switchTab, resetLayout, fitToScreen, debugDiagramData } from './js/ui-controls.js';
 import { buildTreeHtml, selectClass, toggleNode, setTreeState, getClassData, getNamespaces } from './js/tree-builder.js';
 
+// Helper function to render import details recursively
+function renderImportDetails(imports, level = 0) {
+  if (!imports || imports.length === 0) return '';
+  
+  const indent = '  '.repeat(level);
+  return imports.map(imp => `
+    <div style="margin: 5px 0; margin-left: ${level * 20}px; padding: 8px; background: white; border-radius: 3px; border-left: 4px solid ${
+      imp.status === 'loaded' ? '#28a745' : 
+      imp.status === 'already_loaded' ? '#17a2b8' :
+      imp.status === 'skipped' ? '#ffc107' :
+      imp.status === 'file_not_found' ? '#fd7e14' : '#dc3545'
+    };">
+      <strong>${imp.import_uri}</strong> 
+      <span style="color: ${
+        imp.status === 'loaded' ? '#28a745' : 
+        imp.status === 'already_loaded' ? '#17a2b8' :
+        imp.status === 'skipped' ? '#856404' :
+        imp.status === 'file_not_found' ? '#fd7e14' : '#721c24'
+      }; font-weight: bold;">[${imp.status.toUpperCase().replace('_', ' ')}]</span>
+      ${imp.file_path ? `<br><small>File: ${imp.file_path}</small>` : ''}
+      ${imp.triples_count ? `<br><small>Triples: ${imp.triples_count}</small>` : ''}
+      ${imp.error ? `<br><small style="color: #dc3545;">Error: ${imp.error}</small>` : ''}
+      ${imp.nested_imports && imp.nested_imports.length > 0 ? `
+        <div style="margin-top: 10px;">
+          <small><strong>Nested imports (${imp.nested_imports.length}):</strong></small>
+          ${renderImportDetails(imp.nested_imports, level + 1)}
+        </div>
+      ` : ''}
+    </div>
+  `).join('');
+}
+
 // Function to handle file loading
 // extra
 async function loadFile() {
@@ -58,7 +90,8 @@ async function loadFile() {
             <div style="padding: 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; margin-bottom: 15px; color: #155724;">
               <strong>✓ Successfully loaded:</strong> ${selected}<br>
               <strong>Base URI:</strong> ${response.base_uri}<br>
-              <strong>Triples loaded:</strong> ${response.triples_count}
+              <strong>Main file triples:</strong> ${response.triples_count}<br>
+              ${response.total_graphs && response.total_triples ? `<strong>Total dataset:</strong> ${response.total_graphs} graphs, ${response.total_triples} triples` : ''}
             </div>
             
             <h3>Graph Statistics</h3>
@@ -99,6 +132,22 @@ async function loadFile() {
                 <strong>Subclass relationships found:</strong> ${response.subclass_relationships_count}<br>
                 <strong>Full hierarchy tree:</strong>
                 <pre style="font-family: monospace; font-size: 12px; margin: 10px 0; white-space: pre;">${response.hierarchy_debug.full_hierarchy_tree.join('\n')}</pre>
+              </div>
+            ` : ''}
+            
+            ${response.imports && response.imports.length > 0 ? `
+              <h4>Imports (${response.imports_count})</h4>
+              <div style="background: #e7f3ff; padding: 10px; border-radius: 4px; margin: 10px 0;">
+                <strong>Loaded Graphs:</strong> ${response.loaded_graphs ? response.loaded_graphs.length : 0}<br>
+                ${response.loaded_graphs ? `
+                  <div style="margin: 10px 0;">
+                    ${response.loaded_graphs.map(graph => `<div><code>${graph}</code></div>`).join('')}
+                  </div>
+                ` : ''}
+                <strong>Import Details:</strong>
+                <div style="margin: 10px 0;">
+                  ${renderImportDetails(response.imports)}
+                </div>
               </div>
             ` : ''}
             

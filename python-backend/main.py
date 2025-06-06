@@ -161,6 +161,74 @@ def build_debug_tree(hierarchy):
     
     return result
 
+def build_class_hierarchy_from_dataset(dataset):
+    """Build a hierarchical tree structure of classes from all graphs in dataset"""
+    # Collect classes and relationships from all graphs in the dataset
+    all_classes = set()
+    hierarchy = {}
+    
+    # First pass: collect all classes from all graphs
+    for graph in dataset.graphs():
+        graph_classes = set(graph.subjects(RDF.type, OWL.Class)) | set(graph.subjects(RDF.type, RDFS.Class))
+        all_classes.update({cls for cls in graph_classes if not isinstance(cls, BNode)})
+    
+    # Build hierarchy entries for all classes
+    for cls in all_classes:
+        cls_str = str(cls)
+        # Find the best label from any graph
+        label = None
+        properties = []
+        for graph in dataset.graphs():
+            if label is None:
+                label = get_label(graph, cls)
+            # Collect properties from all graphs
+            properties.extend(get_class_properties(graph, cls_str))
+        
+        hierarchy[cls_str] = {
+            "uri": cls_str,
+            "label": label or cls_str.split('#')[-1].split('/')[-1],
+            "children": [],
+            "properties": properties
+        }
+    
+    # Second pass: collect subclass relationships from all graphs
+    roots = set(all_classes)  # Start with all classes as potential roots
+    
+    for graph in dataset.graphs():
+        for cls in all_classes:
+            cls_str = str(cls)
+            # Look for rdfs:subClassOf relationships in this graph
+            parents = list(graph.objects(cls, RDFS.subClassOf))
+            
+            # Filter out owl:Thing and blank nodes as parents
+            meaningful_parents = [p for p in parents if str(p) != str(OWL.Thing) and not isinstance(p, BNode)]
+            
+            if meaningful_parents:
+                roots.discard(cls)  # Remove from roots if it has parents
+                for parent in meaningful_parents:
+                    parent_str = str(parent)
+                    if parent_str in hierarchy and cls_str in hierarchy:
+                        # Avoid duplicates
+                        if hierarchy[cls_str] not in hierarchy[parent_str]["children"]:
+                            hierarchy[parent_str]["children"].append(hierarchy[cls_str])
+    
+    # Sort children alphabetically for each class
+    def sort_hierarchy(node):
+        if node["children"]:
+            node["children"].sort(key=lambda x: x["label"].lower())
+            for child in node["children"]:
+                sort_hierarchy(child)
+    
+    # Get root classes and sort them
+    root_classes = [hierarchy[str(root)] for root in roots if str(root) in hierarchy]
+    root_classes.sort(key=lambda x: x["label"].lower())
+    
+    # Sort all children recursively
+    for root in root_classes:
+        sort_hierarchy(root)
+    
+    return root_classes
+
 def build_class_hierarchy(graph):
     """Build a hierarchical tree structure of classes using rdfs:subClassOf"""
     # Find all classes, excluding blank nodes
@@ -231,6 +299,156 @@ def get_label(graph, resource):
     else:
         return uri_str
 
+def find_owl_imports(graph):
+    """Find all owl:imports statements in the graph"""
+    imports = []
+    for subj, pred, obj in graph.triples((None, OWL.imports, None)):
+        if not isinstance(obj, BNode):
+            imports.append(str(obj))
+    return imports
+
+def resolve_relative_import_path(base_file_path, base_uri, import_uri):
+    """Resolve relative import path for same-domain imports"""
+    
+    # Parse URIs to get components
+    from urllib.parse import urlparse
+    base_parsed = urlparse(base_uri)
+    import_parsed = urlparse(import_uri)
+    
+    # Check if same domain
+    if base_parsed.netloc != import_parsed.netloc or base_parsed.scheme != import_parsed.scheme:
+        return None, f"Different domain: {base_parsed.netloc} vs {import_parsed.netloc}"
+    
+    # Get paths without leading slash
+    base_path = base_parsed.path.lstrip('/')
+    import_path = import_parsed.path.lstrip('/')
+    
+    # Find common prefix
+    base_parts = base_path.split('/')
+    import_parts = import_path.split('/')
+    
+    # Both URIs represent ontologies, so we compare their directory paths
+    # Get the directory portion of each URI path (remove the last part which is the ontology name)
+    base_dir_parts = base_parts[:-1] if base_parts else []
+    import_dir_parts = import_parts[:-1] if import_parts else []
+    import_name = import_parts[-1] if import_parts else ''
+    
+    # Find common prefix length between directories
+    common_len = 0
+    for i in range(min(len(base_dir_parts), len(import_dir_parts))):
+        if base_dir_parts[i] == import_dir_parts[i]:
+            common_len += 1
+        else:
+            break
+    
+    # Calculate relative path from base directory to import directory
+    up_levels = len(base_dir_parts) - common_len
+    relative_parts = ['..'] * up_levels
+    
+    # Go down to import directory, then add the import name
+    relative_parts.extend(import_dir_parts[common_len:])
+    relative_parts.append(import_name)
+    
+    relative_path = '/'.join(relative_parts)
+    
+    # Resolve against base file directory
+    base_dir = os.path.dirname(base_file_path)
+    resolved_path = os.path.normpath(os.path.join(base_dir, relative_path))
+    
+    return resolved_path, None
+
+def load_imports_recursive(dataset, main_file_path, main_base_uri, loaded_uris=None):
+    """Recursively load imports for a dataset"""
+    
+    if loaded_uris is None:
+        loaded_uris = set()
+    
+    # Avoid infinite loops
+    if main_base_uri in loaded_uris:
+        return []
+    
+    loaded_uris.add(main_base_uri)
+    
+    main_graph = dataset.graph(URIRef(main_base_uri))
+    imports = find_owl_imports(main_graph)
+    
+    import_results = []
+    
+    for import_uri in imports:
+        import_info = {
+            "import_uri": import_uri,
+            "status": "pending",
+            "file_path": None,
+            "base_uri": None,
+            "error": None,
+            "nested_imports": []
+        }
+        
+        try:
+            # Resolve relative path
+            resolved_path, error = resolve_relative_import_path(main_file_path, main_base_uri, import_uri)
+            
+            if error:
+                import_info["status"] = "skipped"
+                import_info["error"] = error
+                import_results.append(import_info)
+                continue
+            
+            # Check if file exists, trying common extensions if needed
+            actual_file_path = resolved_path
+            if not os.path.exists(resolved_path):
+                # Try common RDF file extensions
+                extensions_to_try = ['.ttl', '.rdf']
+                found = False
+                for ext in extensions_to_try:
+                    test_path = resolved_path + ext
+                    if os.path.exists(test_path):
+                        actual_file_path = test_path
+                        found = True
+                        break
+                
+                if not found:
+                    import_info["status"] = "file_not_found"
+                    import_info["error"] = f"File not found: {resolved_path} (tried extensions: {', '.join(extensions_to_try)})"
+                    import_results.append(import_info)
+                    continue
+            
+            # Load the import file
+            import_info["file_path"] = actual_file_path
+            
+            # For now, assume the import URI is the base URI (as stated in requirements)
+            import_base_uri = import_uri
+            import_info["base_uri"] = import_base_uri
+            
+            # Check if already loaded
+            if import_base_uri in loaded_uris:
+                import_info["status"] = "already_loaded"
+                print(f"  ⚠ Import already loaded: {import_uri}", file=sys.stderr)
+                import_results.append(import_info)
+                continue
+            
+            # Parse into dataset
+            import_graph = dataset.graph(URIRef(import_base_uri))
+            import_graph.parse(actual_file_path)
+            
+            import_info["status"] = "loaded"
+            import_info["triples_count"] = len(import_graph)
+            
+            print(f"  ✓ Loaded import: {import_uri} ({import_info['triples_count']} triples) from {actual_file_path}", file=sys.stderr)
+            
+            # Recursively load nested imports
+            nested_imports = load_imports_recursive(dataset, actual_file_path, import_base_uri, loaded_uris)
+            import_info["nested_imports"] = nested_imports
+            
+            import_results.append(import_info)
+            
+        except Exception as e:
+            import_info["status"] = "error"
+            import_info["error"] = str(e)
+            import_results.append(import_info)
+    
+    return import_results
+
 def load_rdf_file(file_path):
     """Load an RDF file into a dataset and return statistics"""
     global current_dataset, current_file_path, current_base_uri
@@ -271,8 +489,17 @@ def load_rdf_file(file_path):
                     set(main_graph.subjects(RDF.type, OWL.DatatypeProperty)) | \
                     set(main_graph.subjects(RDF.type, RDF.Property))
         
-        # Build class hierarchy from the main graph (for now - will use dataset later for imports)
-        class_hierarchy = build_class_hierarchy(main_graph)
+        # Load imports recursively
+        print(f"Loading imports for {base_uri}...", file=sys.stderr)
+        import_results = load_imports_recursive(dataset, file_path, base_uri)
+        
+        # Count total graphs and triples in dataset
+        total_graphs = len(list(dataset.graphs()))
+        total_triples = sum(len(g) for g in dataset.graphs())
+        print(f"Import loading complete. Dataset now contains {total_graphs} graphs with {total_triples} total triples.", file=sys.stderr)
+        
+        # After loading imports, build class hierarchy from the entire dataset
+        class_hierarchy = build_class_hierarchy_from_dataset(dataset)
         
         # Count subclass relationships for debugging (direct parent-child relationships only)
         subclass_count = 0
@@ -307,7 +534,12 @@ def load_rdf_file(file_path):
             "hierarchy_debug": {
                 "root_classes": [{"label": root["label"], "children_count": len(root.get("children", []))} for root in class_hierarchy],
                 "full_hierarchy_tree": build_debug_tree(class_hierarchy)
-            }
+            },
+            "imports": import_results,
+            "imports_count": len(import_results),
+            "loaded_graphs": [str(g.identifier) for g in dataset.graphs()],
+            "total_graphs": total_graphs,
+            "total_triples": total_triples
         }
         
     except Exception as e:

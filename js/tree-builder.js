@@ -1,0 +1,169 @@
+/**
+ * Tree view functionality for class hierarchy
+ */
+
+// Global state (will be managed by main.js)
+let classData = {};
+let namespaces = {};
+
+/**
+ * Set global state for tree operations
+ * @param {Object} newClassData - Class data object
+ * @param {Object} newNamespaces - Namespaces object
+ */
+export function setTreeState(newClassData, newNamespaces) {
+  classData = newClassData;
+  namespaces = newNamespaces;
+}
+
+/**
+ * Get current class data
+ * @returns {Object} Current class data
+ */
+export function getClassData() {
+  return classData;
+}
+
+/**
+ * Get current namespaces
+ * @returns {Object} Current namespaces
+ */
+export function getNamespaces() {
+  return namespaces;
+}
+
+/**
+ * Build tree HTML from hierarchy data
+ * @param {Array} nodes - Array of hierarchy nodes
+ * @returns {string} HTML string for the tree
+ */
+export function buildTreeHtml(nodes) {
+  if (!nodes || nodes.length === 0) return '';
+  
+  return nodes.map(node => {
+    // Store class data globally for later retrieval
+    classData[node.uri] = node;
+    
+    const hasChildren = node.children && node.children.length > 0;
+    const toggleSymbol = hasChildren ? '▶' : '•';
+    const childrenHtml = hasChildren ? buildTreeHtml(node.children) : '';
+    
+    return `
+      <div class="tree-node">
+        <span class="tree-toggle" onclick="toggleNode(this)">${toggleSymbol}</span>
+        <span class="tree-label" title="${node.uri}" onclick="selectClass('${node.uri}')">${node.label}</span>
+        ${hasChildren ? `<div class="tree-children collapsed">${childrenHtml}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * Select a class and show its details
+ * @param {string} classUri - URI of the class to select
+ */
+export function selectClass(classUri) {
+  // Remove selection from all labels
+  document.querySelectorAll('.tree-label').forEach(label => {
+    label.classList.remove('selected');
+  });
+  
+  // Add selection to clicked label
+  const clickedLabel = document.querySelector(`[onclick="selectClass('${classUri}')"]`);
+  if (clickedLabel) {
+    clickedLabel.classList.add('selected');
+  }
+  
+  // Show class details
+  showClassDetails(classData[classUri]);
+}
+
+/**
+ * Toggle tree node expansion
+ * @param {Element} toggleElement - The toggle element that was clicked
+ */
+export function toggleNode(toggleElement) {
+  const childrenElement = toggleElement.parentElement.querySelector('.tree-children');
+  if (childrenElement) {
+    const isCollapsed = childrenElement.classList.contains('collapsed');
+    
+    if (isCollapsed) {
+      childrenElement.classList.remove('collapsed');
+      toggleElement.textContent = '▼';
+    } else {
+      childrenElement.classList.add('collapsed');
+      toggleElement.textContent = '▶';
+    }
+  }
+}
+
+/**
+ * Display class details in the right panel
+ * @param {Object} classInfo - Class information object
+ */
+export function showClassDetails(classInfo) {
+  const detailsContainer = document.getElementById('class-details');
+  
+  if (!classInfo) {
+    detailsContainer.innerHTML = `
+      <div class="no-selection">
+        <p>Class not found</p>
+      </div>
+    `;
+    return;
+  }
+  
+  // Build properties form
+  let propertiesHtml = '';
+  if (classInfo.properties && classInfo.properties.length > 0) {
+    propertiesHtml = classInfo.properties.map(prop => {
+      const rangeValues = prop.ranges.length > 0 
+        ? prop.ranges.map(range => range.label).join(', ')
+        : 'No range specified';
+      
+      const propQname = uriToQname(prop.uri);
+      
+      return `
+        <div class="form-group">
+          <label>${prop.label}</label>
+          <div class="property-qname" style="font-size: 11px; color: #666; margin-bottom: 3px;" title="${prop.uri}">${propQname}</div>
+          <div class="property-values ${prop.ranges.length === 0 ? 'empty' : ''}">${rangeValues}</div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    propertiesHtml = `
+      <div class="form-group">
+        <div class="property-values empty">No properties found with this class as domain</div>
+      </div>
+    `;
+  }
+  
+  const classQname = uriToQname(classInfo.uri);
+  
+  detailsContainer.innerHTML = `
+    <div class="class-form active">
+      <h2 title="${classInfo.uri}">${classInfo.label}</h2>
+      <div class="class-info">
+        <p><strong>QName:</strong> <code style="word-break: break-all;" title="${classInfo.uri}">${classQname}</code></p>
+        <h3>Properties</h3>
+        ${propertiesHtml}
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Convert URI to qname if possible
+ * @param {string} uri - URI to convert
+ * @returns {string} QName or original URI
+ */
+function uriToQname(uri) {
+  for (const [prefix, namespace] of Object.entries(namespaces)) {
+    if (uri.startsWith(namespace)) {
+      const localName = uri.substring(namespace.length);
+      return prefix ? `${prefix}:${localName}` : localName;
+    }
+  }
+  return uri; // Return full URI if no matching namespace
+}

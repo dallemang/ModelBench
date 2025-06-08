@@ -73,6 +73,9 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
     return null;
   }
   
+  // Add interaction handlers for editing
+  addEditingHandlers(cytoscapeInstance);
+  
   // Fit to container after layout
   cytoscapeInstance.ready(() => {
     setTimeout(() => {
@@ -361,4 +364,244 @@ function darkenColor(color) {
   }
   // Fallback for non-HSL colors
   return color;
+}
+
+/**
+ * Add editing handlers for creating subclass relationships
+ * @param {Object} cy - Cytoscape instance
+ */
+function addEditingHandlers(cy) {
+  let tempEdge = null;
+  let sourceNode = null;
+  const handles = new Map(); // Store handles for each node
+  
+  // Create handles for all nodes initially
+  function createHandles() {
+    cy.nodes('[type="class"]').forEach(node => {
+      const handle = document.createElement('div');
+      handle.style.position = 'absolute';
+      handle.style.width = '8px';
+      handle.style.height = '8px';
+      handle.style.backgroundColor = '#FF6B6B';
+      handle.style.border = '1px solid #FF4757';
+      handle.style.borderRadius = '50%';
+      handle.style.cursor = 'crosshair';
+      handle.style.zIndex = '1000';
+      handle.style.pointerEvents = 'all';
+      handle.title = 'Drag to create subClassOf relationship';
+      
+      // Position handle just outside the right edge of the node
+      const renderedPosition = node.renderedPosition();
+      handle.style.left = (renderedPosition.x + 65) + 'px'; // Just outside node boundary
+      handle.style.top = (renderedPosition.y - 4) + 'px';   // Center vertically
+      
+      document.getElementById('cytoscape-container').appendChild(handle);
+      handles.set(node.id(), handle);
+      
+      // Handle drag start
+      handle.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        e.stopPropagation(); // Prevent node drag
+        sourceNode = node;
+        
+        console.log('Handle clicked, starting drag from:', node.data('label'));
+        
+        // Disable node dragging temporarily
+        cy.autoungrabify(true);
+        
+        // Create a temporary target node at the handle position first
+        const nodePosition = node.position();
+        const tempTarget = cy.add({
+          group: 'nodes',
+          data: { id: 'temp-mouse-target' },
+          position: { x: nodePosition.x + 100, y: nodePosition.y }, // Start slightly offset
+          style: {
+            'opacity': 0,
+            'width': 1,
+            'height': 1
+          }
+        });
+        
+        // Create temporary edge for visual feedback
+        tempEdge = cy.add({
+          group: 'edges',
+          data: {
+            id: 'temp-edge',
+            source: node.id(),
+            target: 'temp-mouse-target',
+            type: 'temp-subclass'
+          }
+        });
+        
+        console.log('Temporary edge created:', tempEdge.id());
+        
+        // Add temporary edge style
+        tempEdge.style({
+          'line-color': '#FF6B6B',
+          'target-arrow-color': '#FF6B6B',
+          'target-arrow-shape': 'triangle',
+          'line-style': 'dashed',
+          'width': 3,
+          'opacity': 0.7
+        });
+        
+        console.log('Temporary edge styled');
+        
+        document.addEventListener('mousemove', handleDrag);
+        document.addEventListener('mouseup', handleDrop);
+      });
+    });
+  }
+  
+  // Update handle positions
+  function updateHandlePositions() {
+    handles.forEach((handle, nodeId) => {
+      const node = cy.getElementById(nodeId);
+      if (node.length > 0) {
+        const renderedPosition = node.renderedPosition();
+        handle.style.left = (renderedPosition.x + 65) + 'px';
+        handle.style.top = (renderedPosition.y - 4) + 'px';
+      }
+    });
+  }
+  
+  // Create initial handles
+  createHandles();
+  
+  function handleDrag(e) {
+    console.log('Handle drag event');
+    if (tempEdge && sourceNode) {
+      console.log('Processing drag with temp edge');
+      const container = document.getElementById('cytoscape-container');
+      const containerRect = container.getBoundingClientRect();
+      const cyPosition = {
+        x: e.clientX - containerRect.left,
+        y: e.clientY - containerRect.top
+      };
+      
+      // Convert screen coordinates to cytoscape model coordinates
+      const pan = cy.pan();
+      const zoom = cy.zoom();
+      const modelX = (cyPosition.x - pan.x) / zoom;
+      const modelY = (cyPosition.y - pan.y) / zoom;
+      console.log('Mouse position:', cyPosition, 'Model position:', {x: modelX, y: modelY});
+      
+      // Find if we're over a target node (excluding temporary nodes)
+      const targetNode = cy.nodes('[type="class"]').filter(node => {
+        if (node.id() === sourceNode.id() || node.id() === 'temp-mouse-target') {
+          return false; // Exclude source node and temp target
+        }
+        
+        const renderedPos = node.renderedPosition();
+        const nodeWidth = 120;
+        const nodeHeight = 40;
+        
+        return cyPosition.x >= renderedPos.x - nodeWidth/2 &&
+               cyPosition.x <= renderedPos.x + nodeWidth/2 &&
+               cyPosition.y >= renderedPos.y - nodeHeight/2 &&
+               cyPosition.y <= renderedPos.y + nodeHeight/2;
+      });
+      
+      if (targetNode.length > 0 && targetNode[0].id() !== sourceNode.id()) {
+        console.log('Over target node:', targetNode[0].data('label'));
+        // Update temp edge target to the actual node
+        tempEdge.move({ target: targetNode[0].id() });
+        tempEdge.style('line-color', '#4ECDC4'); // Green when over valid target
+        tempEdge.style('target-arrow-color', '#4ECDC4');
+      } else {
+        console.log('Over empty space, creating mouse target');
+        // Create or update temporary target node at mouse position
+        let mouseTarget = cy.getElementById('temp-mouse-target');
+        if (mouseTarget.length === 0) {
+          mouseTarget = cy.add({
+            group: 'nodes',
+            data: { id: 'temp-mouse-target' },
+            position: { x: modelX, y: modelY },
+            style: {
+              'opacity': 0,
+              'width': 1,
+              'height': 1
+            }
+          });
+          console.log('Created mouse target node');
+        } else {
+          mouseTarget.position({ x: modelX, y: modelY });
+          console.log('Updated mouse target position');
+        }
+        
+        tempEdge.move({ target: 'temp-mouse-target' });
+        tempEdge.style('line-color', '#FF6B6B'); // Red when invalid
+        tempEdge.style('target-arrow-color', '#FF6B6B');
+      }
+    } else {
+      console.log('No temp edge or source node');
+    }
+  }
+  
+  function handleDrop(e) {
+    document.removeEventListener('mousemove', handleDrag);
+    document.removeEventListener('mouseup', handleDrop);
+    
+    if (tempEdge && sourceNode) {
+      const container = document.getElementById('cytoscape-container');
+      const containerRect = container.getBoundingClientRect();
+      const cyPosition = {
+        x: e.clientX - containerRect.left,
+        y: e.clientY - containerRect.top
+      };
+      
+      // Find target node
+      const targetNode = cy.nodes().filter(node => {
+        const renderedPos = node.renderedPosition();
+        const nodeWidth = 120;
+        const nodeHeight = 40;
+        
+        return cyPosition.x >= renderedPos.x - nodeWidth/2 &&
+               cyPosition.x <= renderedPos.x + nodeWidth/2 &&
+               cyPosition.y >= renderedPos.y - nodeHeight/2 &&
+               cyPosition.y <= renderedPos.y + nodeHeight/2;
+      });
+      
+      if (targetNode.length > 0 && targetNode[0].id() !== sourceNode.id()) {
+        // Create permanent subclass edge
+        const edgeId = `subclass_${sourceNode.id()}_${targetNode[0].id()}`;
+        
+        // Check if edge already exists
+        const existingEdge = cy.getElementById(edgeId);
+        if (existingEdge.length === 0) {
+          cy.add({
+            group: 'edges',
+            data: {
+              id: edgeId,
+              source: sourceNode.id(),
+              target: targetNode[0].id(),
+              type: 'subclass',
+              label: 'subClassOf'
+            }
+          });
+          
+          console.log(`Created subclass relationship: ${sourceNode.data('label')} subClassOf ${targetNode[0].data('label')}`);
+        }
+      }
+      
+      // Clean up temporary elements
+      tempEdge.remove();
+      tempEdge = null;
+      sourceNode = null;
+      
+      // Remove temporary mouse target node
+      const mouseTarget = cy.getElementById('temp-mouse-target');
+      if (mouseTarget.length > 0) {
+        mouseTarget.remove();
+      }
+    }
+    
+    // Re-enable node dragging
+    cy.autoungrabify(false);
+  }
+  
+  // Update handle positions when nodes move or zoom changes
+  cy.on('position zoom pan', function() {
+    updateHandlePositions();
+  });
 }

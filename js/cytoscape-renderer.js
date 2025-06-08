@@ -404,8 +404,6 @@ function addEditingHandlers(cy) {
         e.stopPropagation(); // Prevent node drag
         sourceNode = node;
         
-        console.log('Handle clicked, starting drag from:', node.data('label'));
-        
         // Disable node dragging temporarily
         cy.autoungrabify(true);
         
@@ -433,8 +431,6 @@ function addEditingHandlers(cy) {
           }
         });
         
-        console.log('Temporary edge created:', tempEdge.id());
-        
         // Add temporary edge style
         tempEdge.style({
           'line-color': '#FF6B6B',
@@ -444,8 +440,6 @@ function addEditingHandlers(cy) {
           'width': 3,
           'opacity': 0.7
         });
-        
-        console.log('Temporary edge styled');
         
         document.addEventListener('mousemove', handleDrag);
         document.addEventListener('mouseup', handleDrop);
@@ -469,9 +463,7 @@ function addEditingHandlers(cy) {
   createHandles();
   
   function handleDrag(e) {
-    console.log('Handle drag event');
     if (tempEdge && sourceNode) {
-      console.log('Processing drag with temp edge');
       const container = document.getElementById('cytoscape-container');
       const containerRect = container.getBoundingClientRect();
       const cyPosition = {
@@ -484,7 +476,6 @@ function addEditingHandlers(cy) {
       const zoom = cy.zoom();
       const modelX = (cyPosition.x - pan.x) / zoom;
       const modelY = (cyPosition.y - pan.y) / zoom;
-      console.log('Mouse position:', cyPosition, 'Model position:', {x: modelX, y: modelY});
       
       // Find if we're over a target node (excluding temporary nodes)
       const targetNode = cy.nodes('[type="class"]').filter(node => {
@@ -503,13 +494,11 @@ function addEditingHandlers(cy) {
       });
       
       if (targetNode.length > 0 && targetNode[0].id() !== sourceNode.id()) {
-        console.log('Over target node:', targetNode[0].data('label'));
         // Update temp edge target to the actual node
         tempEdge.move({ target: targetNode[0].id() });
         tempEdge.style('line-color', '#4ECDC4'); // Green when over valid target
         tempEdge.style('target-arrow-color', '#4ECDC4');
       } else {
-        console.log('Over empty space, creating mouse target');
         // Create or update temporary target node at mouse position
         let mouseTarget = cy.getElementById('temp-mouse-target');
         if (mouseTarget.length === 0) {
@@ -523,18 +512,14 @@ function addEditingHandlers(cy) {
               'height': 1
             }
           });
-          console.log('Created mouse target node');
         } else {
           mouseTarget.position({ x: modelX, y: modelY });
-          console.log('Updated mouse target position');
         }
         
         tempEdge.move({ target: 'temp-mouse-target' });
         tempEdge.style('line-color', '#FF6B6B'); // Red when invalid
         tempEdge.style('target-arrow-color', '#FF6B6B');
       }
-    } else {
-      console.log('No temp edge or source node');
     }
   }
   
@@ -580,7 +565,6 @@ function addEditingHandlers(cy) {
             }
           });
           
-          console.log(`Created subclass relationship: ${sourceNode.data('label')} subClassOf ${targetNode[0].data('label')}`);
         }
       }
       

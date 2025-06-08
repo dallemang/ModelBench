@@ -336,18 +336,18 @@ function getCytoscapeStyle(nodes = []) {
       selector: 'edge[type="property"]',
       style: {
         'width': 2,
-        'line-color': '#E74C3C',
-        'target-arrow-color': '#E74C3C',
+        'line-color': '#333333',
+        'target-arrow-color': '#333333',
         'target-arrow-shape': 'triangle',
         'curve-style': 'bezier',
         'arrow-scale': 1.2,
         'label': 'data(label)',
-        'font-size': '10px',
+        'font-size': '15px',
         'text-rotation': 'autorotate',
         'text-margin-y': -10,
-        'color': '#E74C3C',
-        'text-outline-width': 1,
-        'text-outline-color': 'white'
+        'color': '#333333',
+        'text-outline-width': 0,
+        'text-outline-color': 'transparent'
       }
     }
   );

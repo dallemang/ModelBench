@@ -35,14 +35,11 @@ export function buildCytoscapeDataWithRings(hierarchy) {
   
   // Generate color schemes for each graph
   const graphUris = Object.keys(graphNodes);
-  console.log('Ring layout: Found graph URIs:', graphUris);
   const colorSchemes = generateColorSchemes(graphUris.length);
-  console.log('Ring layout: Generated color schemes:', colorSchemes);
   const graphColorMap = {};
   graphUris.forEach((uri, index) => {
     graphColorMap[uri] = colorSchemes[index];
   });
-  console.log('Ring layout: Graph color map:', graphColorMap);
   
   // Calculate ring matrix layout positions
   const layoutPositions = calculateRingMatrixLayout(hierarchy, graphNodes);
@@ -76,9 +73,7 @@ export function buildCytoscapeDataWithRings(hierarchy) {
     const position = layoutPositions[node.uri] || { x: 0, y: 0 };
     const nodeCategory = categorizeNode(node.uri, rootNodeUris, descendantOfRootUris);
     const graphSource = node.graph_source || 'unknown';
-    console.log(`Node ${node.label} has graph_source: ${graphSource}`);
     const colorScheme = graphColorMap[graphSource] || { root: '#28A745', descendant: '#4A90E2', orphaned: '#D8A7CA' };
-    console.log(`Using color scheme for ${graphSource}:`, colorScheme);
     
     nodes.push({
       data: {

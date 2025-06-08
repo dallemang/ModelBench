@@ -218,10 +218,7 @@ function getCytoscapeStyle(nodes = []) {
       style: {
         'background-color': function(ele) {
           const scheme = ele.data('color_scheme');
-          const graphSource = ele.data('graph_source');
-          const color = scheme ? scheme.root : '#28A745';
-          console.log(`Root node ${ele.data('label')} from ${graphSource} using color:`, color);
-          return color;
+          return scheme ? scheme.root : '#28A745';
         },
         'border-color': function(ele) {
           const scheme = ele.data('color_scheme');
@@ -251,10 +248,7 @@ function getCytoscapeStyle(nodes = []) {
       style: {
         'background-color': function(ele) {
           const scheme = ele.data('color_scheme');
-          const graphSource = ele.data('graph_source');
-          const color = scheme ? scheme.descendant : '#4A90E2';
-          console.log(`Descendant node ${ele.data('label')} from ${graphSource} using color:`, color);
-          return color;
+          return scheme ? scheme.descendant : '#4A90E2';
         },
         'border-color': function(ele) {
           const scheme = ele.data('color_scheme');
@@ -284,10 +278,7 @@ function getCytoscapeStyle(nodes = []) {
       style: {
         'background-color': function(ele) {
           const scheme = ele.data('color_scheme');
-          const graphSource = ele.data('graph_source');
-          const color = scheme ? scheme.orphaned : '#D8A7CA';
-          console.log(`Orphaned node ${ele.data('label')} from ${graphSource} using color:`, color);
-          return color;
+          return scheme ? scheme.orphaned : '#D8A7CA';
         },
         'border-color': function(ele) {
           const scheme = ele.data('color_scheme');

@@ -145,7 +145,7 @@ function getCytoscapeStyle(nodes = []) {
       selector: `node[type="class"][category="root"][graph_source="${graphSource}"]`,
       style: {
         'background-color': scheme.root,
-        'color': 'white',
+        'color': 'black',
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
@@ -153,12 +153,12 @@ function getCytoscapeStyle(nodes = []) {
         'font-weight': 'bold',
         'text-wrap': 'wrap',
         'text-max-width': '100px',
-        'width': '80px',
-        'height': '80px',
-        'shape': 'ellipse',
+        'width': '120px',
+        'height': '40px',
+        'shape': 'rectangle',
         'border-width': '3px',
         'border-color': darkenColor(scheme.root),
-        'text-outline-width': '1px',
+        'text-outline-width': '0px',
         'text-outline-color': darkenColor(scheme.root)
       }
     });
@@ -168,7 +168,7 @@ function getCytoscapeStyle(nodes = []) {
       selector: `node[type="class"][category="descendant"][graph_source="${graphSource}"]`,
       style: {
         'background-color': scheme.descendant,
-        'color': 'white',
+        'color': 'black',
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
@@ -176,12 +176,12 @@ function getCytoscapeStyle(nodes = []) {
         'font-weight': 'bold',
         'text-wrap': 'wrap',
         'text-max-width': '100px',
-        'width': '80px',
-        'height': '80px',
-        'shape': 'ellipse',
+        'width': '120px',
+        'height': '40px',
+        'shape': 'rectangle',
         'border-width': '2px',
         'border-color': darkenColor(scheme.descendant),
-        'text-outline-width': '1px',
+        'text-outline-width': '0px',
         'text-outline-color': darkenColor(scheme.descendant)
       }
     });
@@ -191,7 +191,7 @@ function getCytoscapeStyle(nodes = []) {
       selector: `node[type="class"][category="orphaned"][graph_source="${graphSource}"]`,
       style: {
         'background-color': scheme.orphaned,
-        'color': 'white',
+        'color': 'black',
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
@@ -199,12 +199,12 @@ function getCytoscapeStyle(nodes = []) {
         'font-weight': 'bold',
         'text-wrap': 'wrap',
         'text-max-width': '100px',
-        'width': '80px',
-        'height': '80px',
-        'shape': 'ellipse',
+        'width': '120px',
+        'height': '40px',
+        'shape': 'rectangle',
         'border-width': '2px',
         'border-color': darkenColor(scheme.orphaned),
-        'text-outline-width': '1px',
+        'text-outline-width': '0px',
         'text-outline-color': darkenColor(scheme.orphaned)
       }
     });
@@ -231,7 +231,7 @@ function getCytoscapeStyle(nodes = []) {
           const scheme = ele.data('color_scheme');
           return scheme ? darkenColor(scheme.root) : '#1E7E34';
         },
-        'color': 'white',
+        'color': 'black',
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
@@ -239,11 +239,11 @@ function getCytoscapeStyle(nodes = []) {
         'font-weight': 'bold',
         'text-wrap': 'wrap',
         'text-max-width': '100px',
-        'width': '80px',
-        'height': '80px',
-        'shape': 'ellipse',
+        'width': '120px',
+        'height': '40px',
+        'shape': 'rectangle',
         'border-width': '3px',
-        'text-outline-width': '1px'
+        'text-outline-width': '0px'
       }
     },
     {
@@ -264,7 +264,7 @@ function getCytoscapeStyle(nodes = []) {
           const scheme = ele.data('color_scheme');
           return scheme ? darkenColor(scheme.descendant) : '#2E5A87';
         },
-        'color': 'white',
+        'color': 'black',
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
@@ -272,11 +272,11 @@ function getCytoscapeStyle(nodes = []) {
         'font-weight': 'bold',
         'text-wrap': 'wrap',
         'text-max-width': '100px',
-        'width': '80px',
-        'height': '80px',
-        'shape': 'ellipse',
+        'width': '120px',
+        'height': '40px',
+        'shape': 'rectangle',
         'border-width': '2px',
-        'text-outline-width': '1px'
+        'text-outline-width': '0px'
       }
     },
     {
@@ -297,7 +297,7 @@ function getCytoscapeStyle(nodes = []) {
           const scheme = ele.data('color_scheme');
           return scheme ? darkenColor(scheme.orphaned) : '#B85C91';
         },
-        'color': 'white',
+        'color': 'black',
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
@@ -305,11 +305,11 @@ function getCytoscapeStyle(nodes = []) {
         'font-weight': 'bold',
         'text-wrap': 'wrap',
         'text-max-width': '100px',
-        'width': '80px',
-        'height': '80px',
-        'shape': 'ellipse',
+        'width': '120px',
+        'height': '40px',
+        'shape': 'rectangle',
         'border-width': '2px',
-        'text-outline-width': '1px'
+        'text-outline-width': '0px'
       }
     }
   );

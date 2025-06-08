@@ -174,16 +174,22 @@ function generateColorSchemes(numGraphs) {
   }
   
   return baseHues.map(hue => {
-    // Generate HSL colors with different saturations for root vs descendant
-    const rootSaturation = 80;     // More saturated for roots
-    const descendantSaturation = 60; // Less saturated for descendants
-    const orphanedSaturation = 40;   // Even less for orphaned nodes
-    const lightness = 50;           // Consistent lightness
+    // Avoid pure red (0-20 degrees) - skip to red-orange instead
+    let adjustedHue = hue;
+    if (hue >= 0 && hue <= 20) {
+      adjustedHue = 25; // Red-orange instead of red
+    }
+    
+    // Generate pale HSL colors with high lightness for better readability
+    const rootSaturation = 60;     // More saturated for roots (reduced from 80)
+    const descendantSaturation = 45; // Less saturated for descendants (reduced from 60)
+    const orphanedSaturation = 30;   // Even less for orphaned nodes (reduced from 40)
+    const lightness = 75;           // Much lighter for pale colors (increased from 50)
     
     return {
-      root: `hsl(${hue}, ${rootSaturation}%, ${lightness}%)`,
-      descendant: `hsl(${hue}, ${descendantSaturation}%, ${lightness}%)`,
-      orphaned: `hsl(${hue}, ${orphanedSaturation}%, ${lightness}%)`
+      root: `hsl(${adjustedHue}, ${rootSaturation}%, ${lightness}%)`,
+      descendant: `hsl(${adjustedHue}, ${descendantSaturation}%, ${lightness}%)`,
+      orphaned: `hsl(${adjustedHue}, ${orphanedSaturation}%, ${lightness}%)`
     };
   });
 }

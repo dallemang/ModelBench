@@ -197,6 +197,9 @@ def build_class_hierarchy_from_dataset(dataset):
             "properties": properties,
             "graph_source": graph_source or "unknown"
         }
+        
+        # Debug logging
+        print(f"  Class {cls_str.split('#')[-1].split('/')[-1]} assigned to graph: {graph_source or 'unknown'}", file=sys.stderr)
     
     # Second pass: collect subclass relationships from all graphs
     roots = set(all_classes)  # Start with all classes as potential roots

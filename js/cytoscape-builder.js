@@ -5,6 +5,66 @@
 import { calculateHierarchicalLayout } from './layout.js';
 
 /**
+ * Generate distinct color schemes for multiple graphs
+ * @param {number} numGraphs - Number of graphs to generate colors for
+ * @returns {Array} Array of color scheme objects
+ */
+function generateColorSchemes(numGraphs) {
+  // Base colors distributed around the color wheel for maximum distinction
+  const baseHues = [];
+  for (let i = 0; i < numGraphs; i++) {
+    baseHues.push((i * 360) / numGraphs);
+  }
+  
+  return baseHues.map(hue => {
+    // Generate HSL colors with different saturations for root vs descendant
+    const rootSaturation = 80;     // More saturated for roots
+    const descendantSaturation = 60; // Less saturated for descendants
+    const orphanedSaturation = 40;   // Even less for orphaned nodes
+    const lightness = 50;           // Consistent lightness
+    
+    return {
+      root: `hsl(${hue}, ${rootSaturation}%, ${lightness}%)`,
+      descendant: `hsl(${hue}, ${descendantSaturation}%, ${lightness}%)`,
+      orphaned: `hsl(${hue}, ${orphanedSaturation}%, ${lightness}%)`
+    };
+  });
+}
+
+/**
+ * Group nodes by graph source for color assignment
+ * @param {Array} hierarchy - Array of root nodes
+ * @returns {Object} Map of graph sources to color schemes
+ */
+function assignColorsToGraphs(hierarchy) {
+  // Collect unique graph sources
+  const graphSources = new Set();
+  
+  function collectGraphSources(node) {
+    if (node.graph_source) {
+      graphSources.add(node.graph_source);
+    }
+    if (node.children) {
+      node.children.forEach(child => collectGraphSources(child));
+    }
+  }
+  
+  hierarchy.forEach(root => collectGraphSources(root));
+  
+  // Generate color schemes
+  const graphSourcesList = Array.from(graphSources);
+  const colorSchemes = generateColorSchemes(graphSourcesList.length);
+  
+  // Create mapping
+  const colorMap = {};
+  graphSourcesList.forEach((source, index) => {
+    colorMap[source] = colorSchemes[index] || { root: '#28A745', descendant: '#4A90E2', orphaned: '#D8A7CA' };
+  });
+  
+  return colorMap;
+}
+
+/**
  * Build Cytoscape graph data from class hierarchy
  * @param {Array} hierarchy - Array of root class nodes
  * @returns {Object} Object containing nodes and edges arrays for Cytoscape
@@ -29,6 +89,9 @@ export function buildCytoscapeData(hierarchy) {
   
   // Mark all descendants of all roots
   hierarchy.forEach(root => markDescendants(root));
+  
+  // Generate color schemes for different graphs
+  const graphColorMap = assignColorsToGraphs(hierarchy);
   
   // Calculate custom layout positions
   const layoutPositions = calculateHierarchicalLayout(hierarchy);
@@ -59,16 +122,20 @@ export function buildCytoscapeData(hierarchy) {
     }
     processedClasses.add(node.uri);
     
-    // Add class node with custom position
+    // Add class node with custom position and color scheme
     const position = layoutPositions[node.uri] || { x: 0, y: 0 };
     const nodeCategory = categorizeNode(node.uri, rootNodeUris, descendantOfRootUris);
+    const graphSource = node.graph_source || 'unknown';
+    const colorScheme = graphColorMap[graphSource] || { root: '#28A745', descendant: '#4A90E2', orphaned: '#D8A7CA' };
     
     nodes.push({
       data: {
         id: node.uri,
         label: node.label,
         type: 'class',
-        category: nodeCategory
+        category: nodeCategory,
+        graph_source: graphSource,
+        color_scheme: colorScheme
       },
       position: position
     });
@@ -93,12 +160,35 @@ export function buildCytoscapeData(hierarchy) {
             const position = layoutPositions[range.uri] || { x: Math.random() * 400 - 200, y: Math.random() * 200 + 300 };
             const nodeCategory = categorizeNode(range.uri, rootNodeUris, descendantOfRootUris);
             
+            // Only use 'property_range' as graph_source if this node isn't in the main hierarchy
+            // Check if this range URI exists in our hierarchy data
+            let isInMainHierarchy = false;
+            let hierarchyGraphSource = 'property_range';
+            let hierarchyColorScheme = { root: '#6C757D', descendant: '#6C757D', orphaned: '#6C757D' };
+            
+            function findInHierarchy(node) {
+              if (node.uri === range.uri) {
+                isInMainHierarchy = true;
+                hierarchyGraphSource = node.graph_source || 'unknown';
+                hierarchyColorScheme = graphColorMap[hierarchyGraphSource] || hierarchyColorScheme;
+                return true;
+              }
+              if (node.children) {
+                return node.children.some(child => findInHierarchy(child));
+              }
+              return false;
+            }
+            
+            hierarchy.forEach(root => findInHierarchy(root));
+            
             nodes.push({
               data: {
                 id: range.uri,
                 label: range.label,
                 type: 'class',
-                category: nodeCategory
+                category: nodeCategory,
+                graph_source: hierarchyGraphSource,
+                color_scheme: hierarchyColorScheme
               },
               position: position
             });

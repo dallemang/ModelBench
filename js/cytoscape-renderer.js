@@ -57,7 +57,7 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
     cytoscapeInstance = cytoscape({
       container: container,
       elements: [...nodes, ...edges],
-      style: getCytoscapeStyle(),
+      style: getCytoscapeStyle(nodes),
       layout: {
         name: 'preset',
         animate: true,
@@ -123,16 +123,28 @@ export function fitDiagram() {
 }
 
 /**
- * Get Cytoscape styling configuration
+ * Get Cytoscape styling configuration with dynamic colors
+ * @param {Array} nodes - Array of node objects with color scheme data
  * @returns {Array} Cytoscape style array
  */
-function getCytoscapeStyle() {
-  return [
-    // Root class nodes (green bubbles)
-    {
-      selector: 'node[type="class"][category="root"]',
+function getCytoscapeStyle(nodes = []) {
+  const styles = [];
+  
+  // Collect unique color schemes from nodes
+  const colorSchemes = new Map();
+  nodes.forEach(node => {
+    if (node.data.color_scheme && node.data.graph_source) {
+      colorSchemes.set(node.data.graph_source, node.data.color_scheme);
+    }
+  });
+  
+  // Generate specific selectors for each graph's color scheme
+  colorSchemes.forEach((scheme, graphSource) => {
+    // Root nodes for this graph
+    styles.push({
+      selector: `node[type="class"][category="root"][graph_source="${graphSource}"]`,
       style: {
-        'background-color': '#28A745',
+        'background-color': scheme.root,
         'color': 'white',
         'label': 'data(label)',
         'text-valign': 'center',
@@ -145,16 +157,17 @@ function getCytoscapeStyle() {
         'height': '80px',
         'shape': 'ellipse',
         'border-width': '3px',
-        'border-color': '#1E7E34',
+        'border-color': darkenColor(scheme.root),
         'text-outline-width': '1px',
-        'text-outline-color': '#1E7E34'
+        'text-outline-color': darkenColor(scheme.root)
       }
-    },
-    // Descendant class nodes (blue bubbles)
-    {
-      selector: 'node[type="class"][category="descendant"]',
+    });
+    
+    // Descendant nodes for this graph
+    styles.push({
+      selector: `node[type="class"][category="descendant"][graph_source="${graphSource}"]`,
       style: {
-        'background-color': '#4A90E2',
+        'background-color': scheme.descendant,
         'color': 'white',
         'label': 'data(label)',
         'text-valign': 'center',
@@ -167,17 +180,18 @@ function getCytoscapeStyle() {
         'height': '80px',
         'shape': 'ellipse',
         'border-width': '2px',
-        'border-color': '#2E5A87',
+        'border-color': darkenColor(scheme.descendant),
         'text-outline-width': '1px',
-        'text-outline-color': '#2E5A87'
+        'text-outline-color': darkenColor(scheme.descendant)
       }
-    },
-    // Orphaned class nodes (dusty pink bubbles)
-    {
-      selector: 'node[type="class"][category="orphaned"]',
+    });
+    
+    // Orphaned nodes for this graph
+    styles.push({
+      selector: `node[type="class"][category="orphaned"][graph_source="${graphSource}"]`,
       style: {
-        'background-color': '#D8A7CA',
-        'color': 'black',
+        'background-color': scheme.orphaned,
+        'color': 'white',
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
@@ -189,11 +203,119 @@ function getCytoscapeStyle() {
         'height': '80px',
         'shape': 'ellipse',
         'border-width': '2px',
-        'border-color': '#B85C91',
+        'border-color': darkenColor(scheme.orphaned),
         'text-outline-width': '1px',
-        'text-outline-color': '#B85C91'
+        'text-outline-color': darkenColor(scheme.orphaned)
+      }
+    });
+  });
+  
+  // Fallback styles for nodes without color schemes (traditional layout)
+  // Note: Cytoscape doesn't support :not([attribute]) syntax, so we use a general fallback
+  styles.push(
+    {
+      selector: 'node[type="class"][category="root"]',
+      style: {
+        'background-color': function(ele) {
+          const scheme = ele.data('color_scheme');
+          const graphSource = ele.data('graph_source');
+          const color = scheme ? scheme.root : '#28A745';
+          console.log(`Root node ${ele.data('label')} from ${graphSource} using color:`, color);
+          return color;
+        },
+        'border-color': function(ele) {
+          const scheme = ele.data('color_scheme');
+          return scheme ? darkenColor(scheme.root) : '#1E7E34';
+        },
+        'text-outline-color': function(ele) {
+          const scheme = ele.data('color_scheme');
+          return scheme ? darkenColor(scheme.root) : '#1E7E34';
+        },
+        'color': 'white',
+        'label': 'data(label)',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'font-size': '12px',
+        'font-weight': 'bold',
+        'text-wrap': 'wrap',
+        'text-max-width': '100px',
+        'width': '80px',
+        'height': '80px',
+        'shape': 'ellipse',
+        'border-width': '3px',
+        'text-outline-width': '1px'
       }
     },
+    {
+      selector: 'node[type="class"][category="descendant"]',
+      style: {
+        'background-color': function(ele) {
+          const scheme = ele.data('color_scheme');
+          const graphSource = ele.data('graph_source');
+          const color = scheme ? scheme.descendant : '#4A90E2';
+          console.log(`Descendant node ${ele.data('label')} from ${graphSource} using color:`, color);
+          return color;
+        },
+        'border-color': function(ele) {
+          const scheme = ele.data('color_scheme');
+          return scheme ? darkenColor(scheme.descendant) : '#2E5A87';
+        },
+        'text-outline-color': function(ele) {
+          const scheme = ele.data('color_scheme');
+          return scheme ? darkenColor(scheme.descendant) : '#2E5A87';
+        },
+        'color': 'white',
+        'label': 'data(label)',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'font-size': '12px',
+        'font-weight': 'bold',
+        'text-wrap': 'wrap',
+        'text-max-width': '100px',
+        'width': '80px',
+        'height': '80px',
+        'shape': 'ellipse',
+        'border-width': '2px',
+        'text-outline-width': '1px'
+      }
+    },
+    {
+      selector: 'node[type="class"][category="orphaned"]',
+      style: {
+        'background-color': function(ele) {
+          const scheme = ele.data('color_scheme');
+          const graphSource = ele.data('graph_source');
+          const color = scheme ? scheme.orphaned : '#D8A7CA';
+          console.log(`Orphaned node ${ele.data('label')} from ${graphSource} using color:`, color);
+          return color;
+        },
+        'border-color': function(ele) {
+          const scheme = ele.data('color_scheme');
+          return scheme ? darkenColor(scheme.orphaned) : '#B85C91';
+        },
+        'text-outline-color': function(ele) {
+          const scheme = ele.data('color_scheme');
+          return scheme ? darkenColor(scheme.orphaned) : '#B85C91';
+        },
+        'color': 'white',
+        'label': 'data(label)',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'font-size': '12px',
+        'font-weight': 'bold',
+        'text-wrap': 'wrap',
+        'text-max-width': '100px',
+        'width': '80px',
+        'height': '80px',
+        'shape': 'ellipse',
+        'border-width': '2px',
+        'text-outline-width': '1px'
+      }
+    }
+  );
+  
+  // Add edge styles
+  styles.push(
     // Subclass edges (dotted lines)
     {
       selector: 'edge[type="subclass"]',
@@ -228,5 +350,24 @@ function getCytoscapeStyle() {
         'text-outline-color': 'white'
       }
     }
-  ];
+  );
+  
+  return styles;
+}
+
+/**
+ * Darken a color for borders and outlines
+ * @param {string} color - CSS color string
+ * @returns {string} Darkened color
+ */
+function darkenColor(color) {
+  // Simple darkening by reducing lightness in HSL
+  if (color.startsWith('hsl(')) {
+    return color.replace(/(\d+)%\)$/, (match, lightness) => {
+      const newLightness = Math.max(20, parseInt(lightness) - 20);
+      return `${newLightness}%)`;
+    });
+  }
+  // Fallback for non-HSL colors
+  return color;
 }

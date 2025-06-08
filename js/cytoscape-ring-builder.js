@@ -33,6 +33,17 @@ export function buildCytoscapeDataWithRings(hierarchy) {
   // Group nodes by their source graph
   const graphNodes = groupNodesByGraph(hierarchy);
   
+  // Generate color schemes for each graph
+  const graphUris = Object.keys(graphNodes);
+  console.log('Ring layout: Found graph URIs:', graphUris);
+  const colorSchemes = generateColorSchemes(graphUris.length);
+  console.log('Ring layout: Generated color schemes:', colorSchemes);
+  const graphColorMap = {};
+  graphUris.forEach((uri, index) => {
+    graphColorMap[uri] = colorSchemes[index];
+  });
+  console.log('Ring layout: Graph color map:', graphColorMap);
+  
   // Calculate ring matrix layout positions
   const layoutPositions = calculateRingMatrixLayout(hierarchy, graphNodes);
   
@@ -61,9 +72,13 @@ export function buildCytoscapeDataWithRings(hierarchy) {
     }
     processedClasses.add(node.uri);
     
-    // Add class node with ring layout position
+    // Add class node with ring layout position and color scheme
     const position = layoutPositions[node.uri] || { x: 0, y: 0 };
     const nodeCategory = categorizeNode(node.uri, rootNodeUris, descendantOfRootUris);
+    const graphSource = node.graph_source || 'unknown';
+    console.log(`Node ${node.label} has graph_source: ${graphSource}`);
+    const colorScheme = graphColorMap[graphSource] || { root: '#28A745', descendant: '#4A90E2', orphaned: '#D8A7CA' };
+    console.log(`Using color scheme for ${graphSource}:`, colorScheme);
     
     nodes.push({
       data: {
@@ -71,7 +86,8 @@ export function buildCytoscapeDataWithRings(hierarchy) {
         label: node.label,
         type: 'class',
         category: nodeCategory,
-        graph_source: node.graph_source || 'unknown'
+        graph_source: graphSource,
+        color_scheme: colorScheme
       },
       position: position
     });
@@ -100,13 +116,35 @@ export function buildCytoscapeDataWithRings(hierarchy) {
             };
             const nodeCategory = categorizeNode(range.uri, rootNodeUris, descendantOfRootUris);
             
+            // Only use 'property_range' as graph_source if this node isn't in the main hierarchy
+            // Check if this range URI exists in our hierarchy data
+            let isInMainHierarchy = false;
+            let hierarchyGraphSource = 'property_range';
+            let hierarchyColorScheme = { root: '#6C757D', descendant: '#6C757D', orphaned: '#6C757D' };
+            
+            function findInHierarchy(node) {
+              if (node.uri === range.uri) {
+                isInMainHierarchy = true;
+                hierarchyGraphSource = node.graph_source || 'unknown';
+                hierarchyColorScheme = graphColorMap[hierarchyGraphSource] || hierarchyColorScheme;
+                return true;
+              }
+              if (node.children) {
+                return node.children.some(child => findInHierarchy(child));
+              }
+              return false;
+            }
+            
+            hierarchy.forEach(root => findInHierarchy(root));
+            
             nodes.push({
               data: {
                 id: range.uri,
                 label: range.label,
                 type: 'class',
                 category: nodeCategory,
-                graph_source: 'property_range' // Special category for property ranges
+                graph_source: hierarchyGraphSource,
+                color_scheme: hierarchyColorScheme
               },
               position: position
             });
@@ -120,7 +158,34 @@ export function buildCytoscapeDataWithRings(hierarchy) {
   // Process all root nodes
   hierarchy.forEach(processNode);
   
-  return { nodes, edges, graphNodes };
+  return { nodes, edges, graphNodes, graphColorMap };
+}
+
+/**
+ * Generate distinct color schemes for multiple graphs
+ * @param {number} numGraphs - Number of graphs to generate colors for
+ * @returns {Array} Array of color scheme objects
+ */
+function generateColorSchemes(numGraphs) {
+  // Base colors distributed around the color wheel for maximum distinction
+  const baseHues = [];
+  for (let i = 0; i < numGraphs; i++) {
+    baseHues.push((i * 360) / numGraphs);
+  }
+  
+  return baseHues.map(hue => {
+    // Generate HSL colors with different saturations for root vs descendant
+    const rootSaturation = 80;     // More saturated for roots
+    const descendantSaturation = 60; // Less saturated for descendants
+    const orphanedSaturation = 40;   // Even less for orphaned nodes
+    const lightness = 50;           // Consistent lightness
+    
+    return {
+      root: `hsl(${hue}, ${rootSaturation}%, ${lightness}%)`,
+      descendant: `hsl(${hue}, ${descendantSaturation}%, ${lightness}%)`,
+      orphaned: `hsl(${hue}, ${orphanedSaturation}%, ${lightness}%)`
+    };
+  });
 }
 
 /**

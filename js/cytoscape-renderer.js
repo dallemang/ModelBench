@@ -390,16 +390,18 @@ function addEditingHandlers(cy) {
       handle.style.height = '8px';
       handle.style.backgroundColor = '#FF6B6B';
       handle.style.border = '1px solid #FF4757';
-      handle.style.borderRadius = '50%';
+      handle.style.borderRadius = '0px';
       handle.style.cursor = 'crosshair';
       handle.style.zIndex = '1000';
       handle.style.pointerEvents = 'all';
       handle.title = 'Drag to create subClassOf relationship';
       
-      // Position handle just outside the right edge of the node
+      // Position handle exactly on the right edge of the node
       const renderedPosition = node.renderedPosition();
-      handle.style.left = (renderedPosition.x + 65) + 'px'; // Just outside node boundary
-      handle.style.top = (renderedPosition.y - 4) + 'px';   // Center vertically
+      const zoom = cy.zoom();
+      const nodeWidth = 120 * zoom;
+      handle.style.left = (renderedPosition.x + nodeWidth/2 - 4) + 'px';
+      handle.style.top = (renderedPosition.y - 4) + 'px';
       
       document.getElementById('cytoscape-container').appendChild(handle);
       handles.set(node.id(), handle);
@@ -455,11 +457,14 @@ function addEditingHandlers(cy) {
   
   // Update handle positions
   function updateHandlePositions() {
+    const zoom = cy.zoom();
+    const nodeWidth = 120 * zoom;
+    
     handles.forEach((handle, nodeId) => {
       const node = cy.getElementById(nodeId);
       if (node.length > 0) {
         const renderedPosition = node.renderedPosition();
-        handle.style.left = (renderedPosition.x + 65) + 'px';
+        handle.style.left = (renderedPosition.x + nodeWidth/2 - 4) + 'px';
         handle.style.top = (renderedPosition.y - 4) + 'px';
       }
     });

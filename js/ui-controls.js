@@ -104,7 +104,6 @@ export function toggleLayoutType() {
   
   // Recreate diagram with new layout if we have data
   if (currentHierarchyData) {
-    console.log('Switching to', currentLayoutType, 'layout');
     createClassDiagram(currentHierarchyData, currentLayoutType);
     
     // Fit the diagram after a short delay

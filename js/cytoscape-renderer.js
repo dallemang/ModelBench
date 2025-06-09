@@ -26,7 +26,6 @@ export function resetViewportState() {
  * @returns {Object} Cytoscape instance or null if failed
  */
 export function createClassDiagram(hierarchy, layoutType = 'rings') {
-  console.log('createClassDiagram called with hierarchy:', hierarchy.length, 'nodes');
   
   const container = document.getElementById('cytoscape-container');
   
@@ -43,26 +42,18 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
   
   // Clear existing instance but preserve viewport state
   if (cytoscapeInstance) {
-    console.log('Destroying existing cytoscape instance');
     // Always save current viewport before destroying (user may have moved since last save)
     saveUserViewport();
     cytoscapeInstance.destroy();
     cytoscapeInstance = null;
-    console.log('Instance set to null after destroy, preserved viewport state');
   }
   
   // Choose the appropriate builder based on layout type
-  console.log('DIAGRAM TRACE: Starting diagram creation with layout type:', layoutType);
   let graphData;
   if (layoutType === 'rings') {
     graphData = buildCytoscapeDataWithRings(hierarchy);
-    console.log('Building cytoscape with ring layout:', graphData.nodes.length, 'nodes and', graphData.edges.length, 'edges');
-    if (graphData.graphNodes) {
-      console.log('Ring layout organized', Object.keys(graphData.graphNodes).length, 'graphs:', Object.keys(graphData.graphNodes));
-    }
   } else {
     graphData = buildCytoscapeData(hierarchy);
-    console.log('Building cytoscape with traditional layout:', graphData.nodes.length, 'nodes and', graphData.edges.length, 'edges');
   }
   
   // Store the color mapping globally for hierarchy tree coordination
@@ -124,7 +115,6 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
  * @returns {Object|null} Current Cytoscape instance
  */
 export function getCytoscapeInstance() {
-  console.log('getCytoscapeInstance called, returning:', !!cytoscapeInstance);
   return cytoscapeInstance;
 }
 
@@ -642,8 +632,6 @@ function addEditingHandlers(cy) {
           addTripleToBackend(sourceNode.id(), 'http://www.w3.org/2000/01/rdf-schema#subClassOf', targetNode[0].id())
             .then(response => {
               if (response.success) {
-                console.log('Successfully added subclass relationship to backend:', response);
-                
                 // Refresh the hierarchy from the backend
                 if (window.buildHierarchyFromBackend) {
                   window.buildHierarchyFromBackend();
@@ -691,8 +679,6 @@ async function addTripleToBackend(subject, predicate, object) {
   const { invoke } = await import('@tauri-apps/api/core');
   
   try {
-    console.log('Adding triple:', subject, predicate, object);
-    
     const response = await invoke('add_triple', {
       subject: subject,
       predicate: predicate,

@@ -567,7 +567,7 @@ function addEditingHandlers(cy) {
           });
           
           // Add triple to backend and refresh hierarchy
-          addSubclassToBackend(sourceNode.id(), targetNode[0].id())
+          addTripleToBackend(sourceNode.id(), 'http://www.w3.org/2000/01/rdf-schema#subClassOf', targetNode[0].id())
             .then(response => {
               if (response.success) {
                 console.log('Successfully added subclass relationship to backend:', response);
@@ -609,20 +609,22 @@ function addEditingHandlers(cy) {
 }
 
 /**
- * Call backend to add subclass relationship
- * @param {string} sourceUri - URI of the source class
- * @param {string} targetUri - URI of the target class
+ * Call backend to add a triple
+ * @param {string} subject - URI of the subject
+ * @param {string} predicate - URI of the predicate
+ * @param {string} object - URI of the object
  * @returns {Promise} Response from backend
  */
-async function addSubclassToBackend(sourceUri, targetUri) {
+async function addTripleToBackend(subject, predicate, object) {
   const { invoke } = await import('@tauri-apps/api/core');
   
   try {
-    console.log('Adding subclass relationship:', sourceUri, 'rdfs:subClassOf', targetUri);
+    console.log('Adding triple:', subject, predicate, object);
     
-    const response = await invoke('add_subclass_relationship', {
-      sourceUri: sourceUri,
-      targetUri: targetUri
+    const response = await invoke('add_triple', {
+      subject: subject,
+      predicate: predicate,
+      object: object
     });
     
     return response;

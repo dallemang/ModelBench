@@ -20,9 +20,10 @@ struct QueryRequest {
 }
 
 #[derive(Serialize, Deserialize)]
-struct AddSubclassRequest {
-    source_uri: String,
-    target_uri: String,
+struct AddTripleRequest {
+    subject: String,
+    predicate: String,
+    object: String,
 }
 
 // Global state to track the Python server
@@ -157,9 +158,9 @@ async fn query_graph(sparql_query: String) -> Result<HttpResponse, String> {
 }
 
 #[tauri::command]
-async fn add_subclass_relationship(source_uri: String, target_uri: String) -> Result<HttpResponse, String> {
-    let request = AddSubclassRequest { source_uri, target_uri };
-    let response = make_http_request("POST", "/add_subclass", Some(serde_json::to_value(request).unwrap())).await?;
+async fn add_triple(subject: String, predicate: String, object: String) -> Result<HttpResponse, String> {
+    let request = AddTripleRequest { subject, predicate, object };
+    let response = make_http_request("POST", "/add_triple", Some(serde_json::to_value(request).unwrap())).await?;
     Ok(HttpResponse { data: response })
 }
 
@@ -177,7 +178,7 @@ pub fn run() {
         load_rdf_file, 
         get_graph_info, 
         query_graph, 
-        add_subclass_relationship, 
+        add_triple, 
         get_hierarchy
     ])
     .setup(|app| {

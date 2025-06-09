@@ -158,42 +158,8 @@ async function loadFile() {
           const namespaces = response.namespaces || {};
           setTreeState({}, namespaces);
           
-          // Populate Class Hierarchy tab (main view)
-          const hierarchyTree = document.getElementById('hierarchy-tree');
-          
-          if (response.class_hierarchy && response.class_hierarchy.length > 0) {
-            hierarchyTree.innerHTML = buildTreeHtml(response.class_hierarchy);
-          } else {
-            hierarchyTree.innerHTML = `
-              <p style="color: #666; font-style: italic;">No class hierarchy found in this RDF file.</p>
-              <p style="color: #666; font-size: 14px;">This might be because:</p>
-              <ul style="color: #666; font-size: 14px; margin-left: 20px;">
-                <li>The file contains no OWL/RDFS class definitions</li>
-                <li>Classes are not linked with rdfs:subClassOf relationships</li>
-                <li>The file contains only instance data</li>
-              </ul>
-            `;
-          }
-          
-          // Reset class details panel
-          document.getElementById('class-details').innerHTML = `
-            <div class="no-selection">
-              <p>Select a class from the hierarchy to view its details</p>
-            </div>
-          `;
-          
-          // Create class diagram (use deep copy to avoid interference from tree building)
-          if (response.class_hierarchy && response.class_hierarchy.length > 0) {
-            // Create deep copy for diagram to avoid corruption from tree building
-            const hierarchyCopy = JSON.parse(JSON.stringify(response.class_hierarchy));
-            
-            // Store hierarchy data for layout switching
-            setHierarchyData(hierarchyCopy);
-            
-            // Create diagram with current layout type
-            const layoutType = getCurrentLayoutType();
-            createClassDiagram(hierarchyCopy, layoutType);
-          }
+          // Now build the hierarchy and diagram by querying the backend
+          await buildHierarchyFromBackend();
           
           // Ensure we start on the hierarchy tab
           switchTab('hierarchy');
@@ -233,6 +199,82 @@ window.getNamespaces = getNamespaces;
 document.addEventListener('DOMContentLoaded', () => {
   console.log('Tauri app initialized');
 });
+
+// Function to build hierarchy and diagram from backend
+async function buildHierarchyFromBackend() {
+  try {
+    console.log('Building hierarchy from backend...');
+    
+    // Query the backend for current hierarchy
+    const response = await invoke('get_hierarchy');
+    
+    if (response.success && response.hierarchy) {
+      console.log('Got hierarchy from backend:', response.hierarchy.length, 'root nodes');
+      
+      // Populate Class Hierarchy tab
+      const hierarchyTree = document.getElementById('hierarchy-tree');
+      
+      if (response.hierarchy.length > 0) {
+        hierarchyTree.innerHTML = buildTreeHtml(response.hierarchy);
+      } else {
+        hierarchyTree.innerHTML = `
+          <p style="color: #666; font-style: italic;">No class hierarchy found.</p>
+          <p style="color: #666; font-size: 14px;">This might be because:</p>
+          <ul style="color: #666; font-size: 14px; margin-left: 20px;">
+            <li>The file contains no OWL/RDFS class definitions</li>
+            <li>Classes are not linked with rdfs:subClassOf relationships</li>
+            <li>The file contains only instance data</li>
+          </ul>
+        `;
+      }
+      
+      // Reset class details panel
+      document.getElementById('class-details').innerHTML = `
+        <div class="no-selection">
+          <p>Select a class from the hierarchy to view its details</p>
+        </div>
+      `;
+      
+      // Create class diagram (use deep copy to avoid interference from tree building)
+      if (response.hierarchy.length > 0) {
+        // Create deep copy for diagram to avoid corruption from tree building
+        const hierarchyCopy = JSON.parse(JSON.stringify(response.hierarchy));
+        
+        // Store hierarchy data for layout switching
+        setHierarchyData(hierarchyCopy);
+        
+        // Create diagram with current layout type
+        const layoutType = getCurrentLayoutType();
+        createClassDiagram(hierarchyCopy, layoutType);
+      }
+      
+    } else {
+      console.error('Failed to get hierarchy from backend:', response.error);
+      
+      // Show error in hierarchy tab
+      const hierarchyTree = document.getElementById('hierarchy-tree');
+      hierarchyTree.innerHTML = `
+        <div style="color: #dc3545; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
+          <strong>Error loading hierarchy:</strong> ${response.error || 'Unknown error'}
+        </div>
+      `;
+    }
+    
+  } catch (error) {
+    console.error('Error building hierarchy from backend:', error);
+    
+    // Show error in hierarchy tab
+    const hierarchyTree = document.getElementById('hierarchy-tree');
+    hierarchyTree.innerHTML = `
+      <div style="color: #dc3545; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px;">
+        <strong>Backend Error:</strong> ${error}
+      </div>
+    `;
+  }
+}
+
+// Make the function globally available
+window.buildHierarchyFromBackend = buildHierarchyFromBackend;
 
 // Enable hot module replacement for development
 if (import.meta.hot) {

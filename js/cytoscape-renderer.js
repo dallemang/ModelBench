@@ -379,99 +379,109 @@ function darkenColor(color) {
 function addEditingHandlers(cy) {
   let tempEdge = null;
   let sourceNode = null;
-  const handles = new Map(); // Store handles for each node
   
-  // Create handles for all nodes initially
+  // Create handles as Cytoscape nodes for all class nodes
   function createHandles() {
     cy.nodes('[type="class"]').forEach(node => {
-      const handle = document.createElement('div');
-      handle.style.position = 'absolute';
-      handle.style.width = '8px';
-      handle.style.height = '8px';
-      handle.style.backgroundColor = '#FF6B6B';
-      handle.style.border = '1px solid #FF4757';
-      handle.style.borderRadius = '0px';
-      handle.style.cursor = 'crosshair';
-      handle.style.zIndex = '1000';
-      handle.style.pointerEvents = 'all';
-      handle.title = 'Drag to create subClassOf relationship';
+      const nodePosition = node.position();
+      const handleId = `handle_${node.id()}`;
       
-      // Position handle exactly on the right edge of the node
-      const renderedPosition = node.renderedPosition();
-      const zoom = cy.zoom();
-      const nodeWidth = 120 * zoom;
-      handle.style.left = (renderedPosition.x + nodeWidth/2 - 4) + 'px';
-      handle.style.top = (renderedPosition.y - 4) + 'px';
+      // Create handle as a Cytoscape node positioned on the right edge
+      const handle = cy.add({
+        group: 'nodes',
+        data: { 
+          id: handleId,
+          type: 'handle',
+          parentNode: node.id()
+        },
+        position: { 
+          x: nodePosition.x + 65, // Position on right edge of 120px wide node
+          y: nodePosition.y 
+        }
+      });
       
-      document.getElementById('cytoscape-container').appendChild(handle);
-      handles.set(node.id(), handle);
-      
-      // Handle drag start
-      handle.addEventListener('mousedown', function(e) {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent node drag
-        sourceNode = node;
-        
-        // Disable node dragging temporarily
-        cy.autoungrabify(true);
-        
-        // Create a temporary target node at the handle position first
-        const nodePosition = node.position();
-        const tempTarget = cy.add({
-          group: 'nodes',
-          data: { id: 'temp-mouse-target' },
-          position: { x: nodePosition.x + 100, y: nodePosition.y }, // Start slightly offset
-          style: {
-            'opacity': 0,
-            'width': 1,
-            'height': 1
-          }
-        });
-        
-        // Create temporary edge for visual feedback
-        tempEdge = cy.add({
-          group: 'edges',
-          data: {
-            id: 'temp-edge',
-            source: node.id(),
-            target: 'temp-mouse-target',
-            type: 'temp-subclass'
-          }
-        });
-        
-        // Add temporary edge style
-        tempEdge.style({
-          'line-color': '#FF6B6B',
-          'target-arrow-color': '#FF6B6B',
-          'target-arrow-shape': 'triangle',
-          'line-style': 'dashed',
-          'width': 3,
-          'opacity': 0.7
-        });
-        
-        document.addEventListener('mousemove', handleDrag);
-        document.addEventListener('mouseup', handleDrop);
+      // Style the handle node
+      handle.style({
+        'width': '8px',
+        'height': '8px',
+        'background-color': '#FF6B6B',
+        'border-width': '1px',
+        'border-color': '#FF4757',
+        'shape': 'rectangle',
+        'z-index': 1000
       });
     });
   }
   
-  // Update handle positions
+  // Update handle positions when parent nodes move
   function updateHandlePositions() {
-    const zoom = cy.zoom();
-    const nodeWidth = 120 * zoom;
-    
-    handles.forEach((handle, nodeId) => {
-      const node = cy.getElementById(nodeId);
-      if (node.length > 0) {
-        const renderedPosition = node.renderedPosition();
-        handle.style.left = (renderedPosition.x + nodeWidth/2 - 4) + 'px';
-        handle.style.top = (renderedPosition.y - 4) + 'px';
+    cy.nodes('[type="handle"]').forEach(handle => {
+      const parentNodeId = handle.data('parentNode');
+      const parentNode = cy.getElementById(parentNodeId);
+      if (parentNode.length > 0) {
+        const parentPosition = parentNode.position();
+        handle.position({
+          x: parentPosition.x + 65,
+          y: parentPosition.y
+        });
       }
     });
   }
   
   // Create initial handles
   createHandles();
+  
+  // Add event listeners for handle interaction
+  cy.on('mousedown', '[type="handle"]', function(evt) {
+    const handle = evt.target;
+    const parentNodeId = handle.data('parentNode');
+    sourceNode = cy.getElementById(parentNodeId);
+    
+    evt.preventDefault();
+    evt.stopPropagation();
+    
+    // Disable node dragging temporarily
+    cy.autoungrabify(true);
+    
+    // Create a temporary target node at the handle position
+    const nodePosition = sourceNode.position();
+    const tempTarget = cy.add({
+      group: 'nodes',
+      data: { id: 'temp-mouse-target' },
+      position: { x: nodePosition.x + 100, y: nodePosition.y },
+      style: {
+        'opacity': 0,
+        'width': 1,
+        'height': 1
+      }
+    });
+    
+    // Create temporary edge for visual feedback
+    tempEdge = cy.add({
+      group: 'edges',
+      data: {
+        id: 'temp-edge',
+        source: sourceNode.id(),
+        target: 'temp-mouse-target',
+        type: 'temp-subclass'
+      }
+    });
+    
+    // Add temporary edge style
+    tempEdge.style({
+      'line-color': '#FF6B6B',
+      'target-arrow-color': '#FF6B6B',
+      'target-arrow-shape': 'triangle',
+      'line-style': 'dashed',
+      'width': 3,
+      'opacity': 0.7
+    });
+    
+    // Listen for mouse events on the entire container
+    const container = document.getElementById('cytoscape-container');
+    container.addEventListener('mousemove', handleDrag);
+    container.addEventListener('mouseup', handleDrop);
+  });
   
   function handleDrag(e) {
     if (tempEdge && sourceNode) {
@@ -535,8 +545,9 @@ function addEditingHandlers(cy) {
   }
   
   function handleDrop(e) {
-    document.removeEventListener('mousemove', handleDrag);
-    document.removeEventListener('mouseup', handleDrop);
+    const container = document.getElementById('cytoscape-container');
+    container.removeEventListener('mousemove', handleDrag);
+    container.removeEventListener('mouseup', handleDrop);
     
     if (tempEdge && sourceNode) {
       const container = document.getElementById('cytoscape-container');
@@ -613,8 +624,8 @@ function addEditingHandlers(cy) {
     cy.autoungrabify(false);
   }
   
-  // Update handle positions when nodes move or zoom changes
-  cy.on('position zoom pan', function() {
+  // Update handle positions when nodes move
+  cy.on('position', '[type="class"]', function() {
     updateHandlePositions();
   });
 }

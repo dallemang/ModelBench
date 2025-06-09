@@ -554,6 +554,7 @@ function addEditingHandlers(cy) {
         // Check if edge already exists
         const existingEdge = cy.getElementById(edgeId);
         if (existingEdge.length === 0) {
+          // Add visual edge
           cy.add({
             group: 'edges',
             data: {
@@ -565,6 +566,23 @@ function addEditingHandlers(cy) {
             }
           });
           
+          // Add triple to backend and refresh hierarchy
+          addSubclassToBackend(sourceNode.id(), targetNode[0].id())
+            .then(response => {
+              if (response.success) {
+                console.log('Successfully added subclass relationship to backend:', response);
+                
+                // Refresh the hierarchy from the backend
+                if (window.buildHierarchyFromBackend) {
+                  window.buildHierarchyFromBackend();
+                }
+              } else {
+                console.error('Failed to add subclass relationship to backend:', response.error);
+              }
+            })
+            .catch(error => {
+              console.error('Error calling backend:', error);
+            });
         }
       }
       
@@ -588,4 +606,27 @@ function addEditingHandlers(cy) {
   cy.on('position zoom pan', function() {
     updateHandlePositions();
   });
+}
+
+/**
+ * Call backend to add subclass relationship
+ * @param {string} sourceUri - URI of the source class
+ * @param {string} targetUri - URI of the target class
+ * @returns {Promise} Response from backend
+ */
+async function addSubclassToBackend(sourceUri, targetUri) {
+  const { invoke } = await import('@tauri-apps/api/core');
+  
+  try {
+    console.log('Adding subclass relationship:', sourceUri, 'rdfs:subClassOf', targetUri);
+    
+    const response = await invoke('add_subclass_relationship', {
+      sourceUri: sourceUri,
+      targetUri: targetUri
+    });
+    
+    return response;
+  } catch (error) {
+    throw new Error(`Backend call failed: ${error}`);
+  }
 }

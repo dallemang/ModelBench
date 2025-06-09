@@ -8,6 +8,9 @@ import { buildCytoscapeDataWithRings } from './cytoscape-ring-builder.js';
 // Global Cytoscape instance
 let cytoscapeInstance = null;
 
+// Global viewport state - the user's preferred zoom/pan
+let userViewportState = null;
+
 /**
  * Create and configure Cytoscape instance
  * @param {Array} hierarchy - Class hierarchy data
@@ -30,12 +33,14 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
     return null;
   }
   
-  // Clear existing instance
+  // Clear existing instance but preserve viewport state
   if (cytoscapeInstance) {
     console.log('Destroying existing cytoscape instance');
+    // Always save current viewport before destroying (user may have moved since last save)
+    saveUserViewport();
     cytoscapeInstance.destroy();
     cytoscapeInstance = null;
-    console.log('Instance set to null after destroy');
+    console.log('Instance set to null after destroy, preserved viewport state');
   }
   
   // Choose the appropriate builder based on layout type
@@ -66,8 +71,8 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
       style: getCytoscapeStyle(nodes),
       layout: {
         name: 'preset',
-        animate: true,
-        animationDuration: 1000
+        animate: userViewportState ? false : true, // Don't animate if we're restoring viewport
+        animationDuration: userViewportState ? 0 : 1000
       },
       wheelSensitivity: 0.1,
       minZoom: 0.1,
@@ -82,12 +87,18 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
   // Add interaction handlers for editing
   addEditingHandlers(cytoscapeInstance);
   
-  // Fit to container after layout
+  // Track user viewport changes (zoom, pan, drag)
+  cytoscapeInstance.on('zoom pan drag', function() {
+    // Debounce to avoid saving too frequently
+    clearTimeout(cytoscapeInstance._saveViewportTimeout);
+    cytoscapeInstance._saveViewportTimeout = setTimeout(() => {
+      saveUserViewport();
+    }, 200);
+  });
+  
+  // Apply viewport state after layout
   cytoscapeInstance.ready(() => {
-    setTimeout(() => {
-      cytoscapeInstance.fit();
-      cytoscapeInstance.center();
-    }, 100);
+    applyUserViewport();
   });
   
   
@@ -117,9 +128,51 @@ export function resetDiagramLayout() {
 }
 
 /**
- * Fit diagram to screen with slight zoom reduction
+ * Apply the user's preferred viewport state, or fit to screen if none set
+ */
+function applyUserViewport() {
+  if (!cytoscapeInstance) return;
+  
+  console.log('applyUserViewport called, userViewportState:', userViewportState);
+  
+  if (userViewportState) {
+    console.log('Applying saved viewport:', userViewportState);
+    cytoscapeInstance.zoom(userViewportState.zoom);
+    cytoscapeInstance.pan(userViewportState.pan);
+  } else {
+    console.log('No saved viewport, fitting to screen');
+    // First time - fit to screen and save as user preference
+    cytoscapeInstance.fit();
+    cytoscapeInstance.center();
+    const currentZoom = cytoscapeInstance.zoom();
+    cytoscapeInstance.zoom(currentZoom * 0.9);
+    cytoscapeInstance.center();
+    
+    // Save this as the user's preferred state
+    saveUserViewport();
+  }
+}
+
+/**
+ * Save the current viewport as the user's preferred state
+ */
+function saveUserViewport() {
+  if (cytoscapeInstance) {
+    userViewportState = {
+      zoom: cytoscapeInstance.zoom(),
+      pan: cytoscapeInstance.pan()
+    };
+    console.log('Saved user viewport state:', userViewportState);
+  }
+}
+
+/**
+ * Fit diagram to screen and update user preference
  */
 export function fitDiagram() {
+  console.log('🔍 fitDiagram() called - this will override user viewport!');
+  console.trace('fitDiagram call stack');
+  
   if (cytoscapeInstance) {
     cytoscapeInstance.fit();
     cytoscapeInstance.center();
@@ -128,6 +181,9 @@ export function fitDiagram() {
     const currentZoom = cytoscapeInstance.zoom();
     cytoscapeInstance.zoom(currentZoom * 0.9);
     cytoscapeInstance.center();
+    
+    // Save this as the new user preference
+    saveUserViewport();
   }
 }
 

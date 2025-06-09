@@ -33,10 +33,9 @@ export function switchTab(tabName) {
     console.log('Switching to diagram tab, cytoscape instance:', cytoscapeInstance);
     if (cytoscapeInstance) {
       setTimeout(() => {
-        console.log('Resizing and fitting diagram...');
+        console.log('Resizing diagram...');
         cytoscapeInstance.resize();
-        fitDiagram();
-        console.log('Resize and fit complete');
+        console.log('Resize complete');
       }, 300);
     } else {
       console.log('No cytoscape instance found!');

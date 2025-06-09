@@ -64,10 +64,9 @@ async function loadFile() {
       switchTab('log');
       
       try {
-        // Call Python backend to load RDF file
-        const response = await invoke('call_python_backend', {
-          command: 'load_rdf',
-          args: [selected]
+        // Call HTTP backend to load RDF file
+        const response = await invoke('load_rdf_file', {
+          filePath: selected
         });
         
         console.log('Python response:', response);

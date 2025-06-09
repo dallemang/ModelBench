@@ -9,6 +9,7 @@ import { getCytoscapeInstance, resetDiagramLayout, fitDiagram, createClassDiagra
  * @param {string} tabName - Name of the tab to switch to
  */
 export function switchTab(tabName) {
+  
   // Remove active class from all tab buttons and panes
   document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
   document.querySelectorAll('.tab-pane').forEach(pane => {
@@ -30,15 +31,16 @@ export function switchTab(tabName) {
     document.querySelector('.tab-content').classList.add('diagram-active');
     
     const cytoscapeInstance = getCytoscapeInstance();
-    console.log('Switching to diagram tab, cytoscape instance:', cytoscapeInstance);
     if (cytoscapeInstance) {
       setTimeout(() => {
-        console.log('Resizing diagram...');
         cytoscapeInstance.resize();
-        console.log('Resize complete');
+        
+        // If this is the first time showing the diagram, fit it properly
+        if (!window.diagramHasBeenShown) {
+          fitDiagram();
+          window.diagramHasBeenShown = true;
+        }
       }, 300);
-    } else {
-      console.log('No cytoscape instance found!');
     }
   }
 }

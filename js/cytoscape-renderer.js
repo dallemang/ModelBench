@@ -12,6 +12,15 @@ let cytoscapeInstance = null;
 let userViewportState = null;
 
 /**
+ * Reset viewport state for new file loads
+ */
+export function resetViewportState() {
+  userViewportState = null;
+  window.diagramHasBeenShown = false;
+  console.log('Viewport state reset for new file load');
+}
+
+/**
  * Create and configure Cytoscape instance
  * @param {Array} hierarchy - Class hierarchy data
  * @param {string} layoutType - Layout type: 'traditional' or 'rings'
@@ -98,7 +107,13 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
   
   // Apply viewport state after layout
   cytoscapeInstance.ready(() => {
-    applyUserViewport();
+    if (userViewportState) {
+      // Restore saved viewport
+      applyUserViewport();
+    } else {
+      // Initial load - don't fit here since diagram might be hidden
+      // fitDiagram() will be called when diagram tab becomes visible
+    }
   });
   
   
@@ -131,26 +146,10 @@ export function resetDiagramLayout() {
  * Apply the user's preferred viewport state, or fit to screen if none set
  */
 function applyUserViewport() {
-  if (!cytoscapeInstance) return;
+  if (!cytoscapeInstance || !userViewportState) return;
   
-  console.log('applyUserViewport called, userViewportState:', userViewportState);
-  
-  if (userViewportState) {
-    console.log('Applying saved viewport:', userViewportState);
-    cytoscapeInstance.zoom(userViewportState.zoom);
-    cytoscapeInstance.pan(userViewportState.pan);
-  } else {
-    console.log('No saved viewport, fitting to screen');
-    // First time - fit to screen and save as user preference
-    cytoscapeInstance.fit();
-    cytoscapeInstance.center();
-    const currentZoom = cytoscapeInstance.zoom();
-    cytoscapeInstance.zoom(currentZoom * 0.9);
-    cytoscapeInstance.center();
-    
-    // Save this as the user's preferred state
-    saveUserViewport();
-  }
+  cytoscapeInstance.zoom(userViewportState.zoom);
+  cytoscapeInstance.pan(userViewportState.pan);
 }
 
 /**
@@ -162,7 +161,6 @@ function saveUserViewport() {
       zoom: cytoscapeInstance.zoom(),
       pan: cytoscapeInstance.pan()
     };
-    console.log('Saved user viewport state:', userViewportState);
   }
 }
 
@@ -170,9 +168,6 @@ function saveUserViewport() {
  * Fit diagram to screen and update user preference
  */
 export function fitDiagram() {
-  console.log('🔍 fitDiagram() called - this will override user viewport!');
-  console.trace('fitDiagram call stack');
-  
   if (cytoscapeInstance) {
     cytoscapeInstance.fit();
     cytoscapeInstance.center();

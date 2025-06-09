@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import { createClassDiagram } from './js/cytoscape-renderer.js';
+import { createClassDiagram, resetViewportState } from './js/cytoscape-renderer.js';
 import { switchTab, resetLayout, fitToScreen, debugDiagramData, toggleLayoutType, setHierarchyData, getCurrentLayoutType } from './js/ui-controls.js';
 import { buildTreeHtml, selectClass, toggleNode, setTreeState, getClassData, getNamespaces } from './js/tree-builder.js';
 import { assignColorsToGraphs } from './js/color-utils.js';
@@ -57,6 +57,9 @@ async function loadFile() {
     });
 
     if (selected) {
+      // Reset viewport state for new file load
+      resetViewportState();
+      
       // Show loading message in log
       const graphStats = document.getElementById('graph-stats');
       

@@ -17,7 +17,6 @@ let userViewportState = null;
 export function resetViewportState() {
   userViewportState = null;
   window.diagramHasBeenShown = false;
-  console.log('Viewport state reset for new file load');
 }
 
 /**

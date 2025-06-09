@@ -328,8 +328,8 @@ def resolve_relative_import_path(base_file_path, base_uri, import_uri):
         return None, f"Different domain: {base_parsed.netloc} vs {import_parsed.netloc}"
     
     # Get paths without leading slash
-    base_path = base_parsed.path.lstrip('/')
-    import_path = import_parsed.path.lstrip('/')
+    base_path = base_parsed.path.strip('/')
+    import_path = import_parsed.path.strip('/')
     
     # Find common prefix
     base_parts = base_path.split('/')

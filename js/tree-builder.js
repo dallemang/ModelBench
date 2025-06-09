@@ -2,9 +2,14 @@
  * Tree view functionality for class hierarchy
  */
 
+import { assignColorsToGraphs, getNodeColor } from './color-utils.js';
+
 // Global state (will be managed by main.js)
 let classData = {};
 let namespaces = {};
+let currentGraphColorMap = {};
+let currentRootNodeUris = new Set();
+let currentDescendantOfRootUris = new Set();
 
 /**
  * Set global state for tree operations
@@ -35,10 +40,37 @@ export function getNamespaces() {
 /**
  * Build tree HTML from hierarchy data
  * @param {Array} nodes - Array of hierarchy nodes
+ * @param {Object} graphColorMap - Required pre-calculated color mapping
  * @returns {string} HTML string for the tree
  */
-export function buildTreeHtml(nodes) {
+export function buildTreeHtml(nodes, graphColorMap, rootNodeUris = null, descendantOfRootUris = null) {
   if (!nodes || nodes.length === 0) return '';
+  
+  // Color map should ALWAYS be provided - no fallback calculation
+  if (!graphColorMap) {
+    throw new Error('buildTreeHtml: graphColorMap must be provided');
+  }
+  
+  currentGraphColorMap = graphColorMap;
+  
+  // Track which nodes are roots vs descendants (only for top-level call)
+  if (rootNodeUris === null || descendantOfRootUris === null) {
+    currentRootNodeUris = new Set(nodes.map(root => root.uri));
+    currentDescendantOfRootUris = new Set();
+    
+    function markDescendants(node) {
+      currentDescendantOfRootUris.add(node.uri);
+      if (node.children) {
+        node.children.forEach(child => markDescendants(child));
+      }
+    }
+    
+    nodes.forEach(root => markDescendants(root));
+  } else {
+    // Use the passed-in sets for recursive calls
+    currentRootNodeUris = rootNodeUris;
+    currentDescendantOfRootUris = descendantOfRootUris;
+  }
   
   return nodes.map(node => {
     // Store class data globally for later retrieval
@@ -46,12 +78,15 @@ export function buildTreeHtml(nodes) {
     
     const hasChildren = node.children && node.children.length > 0;
     const toggleSymbol = hasChildren ? '▶' : '•';
-    const childrenHtml = hasChildren ? buildTreeHtml(node.children) : '';
+    const childrenHtml = hasChildren ? buildTreeHtml(node.children, currentGraphColorMap, currentRootNodeUris, currentDescendantOfRootUris) : '';
+    
+    // Get the appropriate text color for this node
+    const textColor = getNodeColor(node, currentGraphColorMap, currentRootNodeUris, currentDescendantOfRootUris, true, "HIERARCHY");
     
     return `
       <div class="tree-node">
         <span class="tree-toggle" onclick="toggleNode(this)">${toggleSymbol}</span>
-        <span class="tree-label" title="${node.uri}" onclick="selectClass('${node.uri}')">${node.label}</span>
+        <span class="tree-label" title="${node.uri}" onclick="selectClass('${node.uri}')" style="color: ${textColor}; font-weight: bold;">${node.label}</span>
         ${hasChildren ? `<div class="tree-children collapsed">${childrenHtml}</div>` : ''}
       </div>
     `;

@@ -39,6 +39,7 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
   }
   
   // Choose the appropriate builder based on layout type
+  console.log('DIAGRAM TRACE: Starting diagram creation with layout type:', layoutType);
   let graphData;
   if (layoutType === 'rings') {
     graphData = buildCytoscapeDataWithRings(hierarchy);
@@ -49,6 +50,11 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
   } else {
     graphData = buildCytoscapeData(hierarchy);
     console.log('Building cytoscape with traditional layout:', graphData.nodes.length, 'nodes and', graphData.edges.length, 'edges');
+  }
+  
+  // Store the color mapping globally for hierarchy tree coordination
+  if (graphData.graphColorMap) {
+    window.currentGraphColorMap = graphData.graphColorMap;
   }
   
   const { nodes, edges } = graphData;

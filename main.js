@@ -3,6 +3,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { createClassDiagram } from './js/cytoscape-renderer.js';
 import { switchTab, resetLayout, fitToScreen, debugDiagramData, toggleLayoutType, setHierarchyData, getCurrentLayoutType } from './js/ui-controls.js';
 import { buildTreeHtml, selectClass, toggleNode, setTreeState, getClassData, getNamespaces } from './js/tree-builder.js';
+import { assignColorsToGraphs } from './js/color-utils.js';
 
 // Helper function to render import details recursively
 function renderImportDetails(imports, level = 0) {
@@ -211,12 +212,38 @@ async function buildHierarchyFromBackend() {
     if (response.success && response.hierarchy) {
       console.log('Got hierarchy from backend:', response.hierarchy.length, 'root nodes');
       
-      // Populate Class Hierarchy tab
-      const hierarchyTree = document.getElementById('hierarchy-tree');
-      
       if (response.hierarchy.length > 0) {
-        hierarchyTree.innerHTML = buildTreeHtml(response.hierarchy);
+        // FIRST: Calculate colors for all ontologies before building any views
+        const graphColorMap = assignColorsToGraphs(response.hierarchy);
+        console.log('MAIN TRACE: Calculated color map for', Object.keys(graphColorMap).length, 'ontologies:', Object.keys(graphColorMap));
+        
+        // Store globally for access by both hierarchy and diagram
+        window.currentGraphColorMap = graphColorMap;
+        
+        // SECOND: Populate Class Hierarchy tab with colors
+        const hierarchyTree = document.getElementById('hierarchy-tree');
+        console.log('HIERARCHY TRACE: Building hierarchy with color map:', graphColorMap);
+        hierarchyTree.innerHTML = buildTreeHtml(response.hierarchy, graphColorMap);
+        
+        // Reset class details panel
+        document.getElementById('class-details').innerHTML = `
+          <div class="no-selection">
+            <p>Select a class from the hierarchy to view its details</p>
+          </div>
+        `;
+        
+        // THIRD: Create class diagram (use deep copy to avoid interference from tree building)
+        const hierarchyCopy = JSON.parse(JSON.stringify(response.hierarchy));
+        
+        // Store hierarchy data for layout switching
+        setHierarchyData(hierarchyCopy);
+        
+        // Create diagram with current layout type
+        const layoutType = getCurrentLayoutType();
+        createClassDiagram(hierarchyCopy, layoutType);
       } else {
+        // Populate Class Hierarchy tab
+        const hierarchyTree = document.getElementById('hierarchy-tree');
         hierarchyTree.innerHTML = `
           <p style="color: #666; font-style: italic;">No class hierarchy found.</p>
           <p style="color: #666; font-size: 14px;">This might be because:</p>
@@ -226,26 +253,6 @@ async function buildHierarchyFromBackend() {
             <li>The file contains only instance data</li>
           </ul>
         `;
-      }
-      
-      // Reset class details panel
-      document.getElementById('class-details').innerHTML = `
-        <div class="no-selection">
-          <p>Select a class from the hierarchy to view its details</p>
-        </div>
-      `;
-      
-      // Create class diagram (use deep copy to avoid interference from tree building)
-      if (response.hierarchy.length > 0) {
-        // Create deep copy for diagram to avoid corruption from tree building
-        const hierarchyCopy = JSON.parse(JSON.stringify(response.hierarchy));
-        
-        // Store hierarchy data for layout switching
-        setHierarchyData(hierarchyCopy);
-        
-        // Create diagram with current layout type
-        const layoutType = getCurrentLayoutType();
-        createClassDiagram(hierarchyCopy, layoutType);
       }
       
     } else {

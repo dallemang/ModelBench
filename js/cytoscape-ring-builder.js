@@ -3,6 +3,7 @@
  */
 
 import { calculateRingMatrixLayout, groupNodesByGraph } from './ring-layout.js';
+import { assignColorsToGraphs, categorizeNode, getNodeColor } from './color-utils.js';
 
 /**
  * Build Cytoscape graph data using ring layout for multiple graphs
@@ -33,13 +34,8 @@ export function buildCytoscapeDataWithRings(hierarchy) {
   // Group nodes by their source graph
   const graphNodes = groupNodesByGraph(hierarchy);
   
-  // Generate color schemes for each graph
-  const graphUris = Object.keys(graphNodes);
-  const colorSchemes = generateColorSchemes(graphUris.length);
-  const graphColorMap = {};
-  graphUris.forEach((uri, index) => {
-    graphColorMap[uri] = colorSchemes[index];
-  });
+  // Generate color schemes for each graph using shared utility
+  const graphColorMap = assignColorsToGraphs(hierarchy);
   
   // Calculate ring matrix layout positions
   const layoutPositions = calculateRingMatrixLayout(hierarchy, graphNodes);
@@ -74,6 +70,9 @@ export function buildCytoscapeDataWithRings(hierarchy) {
     const nodeCategory = categorizeNode(node.uri, rootNodeUris, descendantOfRootUris);
     const graphSource = node.graph_source || 'unknown';
     const colorScheme = graphColorMap[graphSource] || { root: '#28A745', descendant: '#4A90E2', orphaned: '#D8A7CA' };
+    
+    // Get the actual color that will be used (for tracing)
+    const nodeColor = getNodeColor(node, graphColorMap, rootNodeUris, descendantOfRootUris, false, "DIAGRAM");
     
     nodes.push({
       data: {
@@ -156,52 +155,4 @@ export function buildCytoscapeDataWithRings(hierarchy) {
   return { nodes, edges, graphNodes, graphColorMap };
 }
 
-/**
- * Generate distinct color schemes for multiple graphs
- * @param {number} numGraphs - Number of graphs to generate colors for
- * @returns {Array} Array of color scheme objects
- */
-function generateColorSchemes(numGraphs) {
-  // Base colors distributed around the color wheel for maximum distinction
-  const baseHues = [];
-  for (let i = 0; i < numGraphs; i++) {
-    baseHues.push((i * 360) / numGraphs);
-  }
-  
-  return baseHues.map(hue => {
-    // Avoid pure red (0-20 degrees) - skip to red-orange instead
-    let adjustedHue = hue;
-    if (hue >= 0 && hue <= 20) {
-      adjustedHue = 25; // Red-orange instead of red
-    }
-    
-    // Generate pale HSL colors with high lightness for better readability
-    const rootSaturation = 60;     // More saturated for roots (reduced from 80)
-    const descendantSaturation = 45; // Less saturated for descendants (reduced from 60)
-    const orphanedSaturation = 30;   // Even less for orphaned nodes (reduced from 40)
-    const lightness = 75;           // Much lighter for pale colors (increased from 50)
-    
-    return {
-      root: `hsl(${adjustedHue}, ${rootSaturation}%, ${lightness}%)`,
-      descendant: `hsl(${adjustedHue}, ${descendantSaturation}%, ${lightness}%)`,
-      orphaned: `hsl(${adjustedHue}, ${orphanedSaturation}%, ${lightness}%)`
-    };
-  });
-}
 
-/**
- * Categorize a node based on its relationship to the hierarchy
- * @param {string} nodeUri - URI of the node to categorize
- * @param {Set} rootNodeUris - Set of root node URIs
- * @param {Set} descendantOfRootUris - Set of descendant node URIs
- * @returns {string} Node category: 'root', 'descendant', or 'orphaned'
- */
-function categorizeNode(nodeUri, rootNodeUris, descendantOfRootUris) {
-  if (rootNodeUris.has(nodeUri)) {
-    return 'root';
-  } else if (descendantOfRootUris.has(nodeUri)) {
-    return 'descendant';
-  } else {
-    return 'orphaned';
-  }
-}

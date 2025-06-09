@@ -32,9 +32,7 @@ export function buildCytoscapeData(hierarchy) {
   // Mark all descendants of all roots
   hierarchy.forEach(root => markDescendants(root));
   
-  // Use globally assigned color map if available, otherwise calculate new one
   const graphColorMap = window.currentGraphColorMap || assignColorsToGraphs(hierarchy);
-  console.log('DIAGRAM TRACE: Using color map:', graphColorMap);
   
   // Calculate custom layout positions
   const layoutPositions = calculateHierarchicalLayout(hierarchy);

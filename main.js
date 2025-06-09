@@ -213,36 +213,26 @@ async function buildHierarchyFromBackend() {
       console.log('Got hierarchy from backend:', response.hierarchy.length, 'root nodes');
       
       if (response.hierarchy.length > 0) {
-        // FIRST: Calculate colors for all ontologies before building any views
         const graphColorMap = assignColorsToGraphs(response.hierarchy);
-        console.log('MAIN TRACE: Calculated color map for', Object.keys(graphColorMap).length, 'ontologies:', Object.keys(graphColorMap));
         
-        // Store globally for access by both hierarchy and diagram
         window.currentGraphColorMap = graphColorMap;
         
-        // SECOND: Populate Class Hierarchy tab with colors
         const hierarchyTree = document.getElementById('hierarchy-tree');
-        console.log('HIERARCHY TRACE: Building hierarchy with color map:', graphColorMap);
         hierarchyTree.innerHTML = buildTreeHtml(response.hierarchy, graphColorMap);
         
-        // Reset class details panel
         document.getElementById('class-details').innerHTML = `
           <div class="no-selection">
             <p>Select a class from the hierarchy to view its details</p>
           </div>
         `;
         
-        // THIRD: Create class diagram (use deep copy to avoid interference from tree building)
         const hierarchyCopy = JSON.parse(JSON.stringify(response.hierarchy));
         
-        // Store hierarchy data for layout switching
         setHierarchyData(hierarchyCopy);
         
-        // Create diagram with current layout type
         const layoutType = getCurrentLayoutType();
         createClassDiagram(hierarchyCopy, layoutType);
       } else {
-        // Populate Class Hierarchy tab
         const hierarchyTree = document.getElementById('hierarchy-tree');
         hierarchyTree.innerHTML = `
           <p style="color: #666; font-style: italic;">No class hierarchy found.</p>

@@ -240,6 +240,9 @@ function getCytoscapeStyle(nodes = []) {
       selector: `node[type="class"][category="orphaned"][graph_source="${graphSource}"]`,
       style: {
         'background-color': scheme.orphaned,
+        'background-image': createCrosshatchPattern(scheme.orphaned),
+        'background-fit': 'none',
+        'background-repeat': 'repeat',
         'color': 'black',
         'label': 'data(label)',
         'text-valign': 'center',
@@ -257,6 +260,32 @@ function getCytoscapeStyle(nodes = []) {
         'text-outline-color': darkenColor(scheme.orphaned)
       }
     });
+  });
+  
+  // Style for property range nodes (foster orphans)
+  styles.push({
+    selector: 'node[type="class"][graph_source="property_range"]',
+    style: {
+      'background-color': '#6C757D',
+      'background-image': createCrosshatchPattern('#6C757D'),
+      'background-fit': 'none',
+      'background-repeat': 'repeat',
+      'color': 'black',
+      'label': 'data(label)',
+      'text-valign': 'center',
+      'text-halign': 'center',
+      'font-size': '12px',
+      'font-weight': 'bold',
+      'text-wrap': 'wrap',
+      'text-max-width': '100px',
+      'width': '120px',
+      'height': '40px',
+      'shape': 'rectangle',
+      'border-width': '2px',
+      'border-color': darkenColor('#6C757D'),
+      'text-outline-width': '0px',
+      'text-outline-color': darkenColor('#6C757D')
+    }
   });
   
   // Fallback styles for nodes without color schemes (traditional layout)
@@ -329,6 +358,13 @@ function getCytoscapeStyle(nodes = []) {
           const scheme = ele.data('color_scheme');
           return scheme ? scheme.orphaned : '#D8A7CA';
         },
+        'background-image': function(ele) {
+          const scheme = ele.data('color_scheme');
+          const color = scheme ? scheme.orphaned : '#D8A7CA';
+          return createCrosshatchPattern(color);
+        },
+        'background-fit': 'none',
+        'background-repeat': 'repeat',
         'border-color': function(ele) {
           const scheme = ele.data('color_scheme');
           return scheme ? darkenColor(scheme.orphaned) : '#B85C91';
@@ -393,6 +429,31 @@ function getCytoscapeStyle(nodes = []) {
   );
   
   return styles;
+}
+
+/**
+ * Create a crosshatch pattern SVG for orphaned nodes
+ * @param {string} baseColor - Base color for the pattern
+ * @returns {string} Data URL for SVG pattern
+ */
+function createCrosshatchPattern(baseColor) {
+  // Extract darker color for lines
+  const lineColor = darkenColor(baseColor);
+  
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10">
+      <defs>
+        <pattern id="crosshatch" patternUnits="userSpaceOnUse" width="10" height="10">
+          <rect width="10" height="10" fill="transparent"/>
+          <line x1="0" y1="0" x2="10" y2="10" stroke="${lineColor}" stroke-width="0.5" opacity="0.3"/>
+          <line x1="0" y1="10" x2="10" y2="0" stroke="${lineColor}" stroke-width="0.5" opacity="0.3"/>
+        </pattern>
+      </defs>
+      <rect width="10" height="10" fill="url(#crosshatch)"/>
+    </svg>
+  `;
+  
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
 }
 
 /**

@@ -104,7 +104,9 @@ async function loadFile() {
               <div><strong>Predicates:</strong> ${response.predicates_count}</div>
               <div><strong>Objects:</strong> ${response.objects_count}</div>
               <div><strong>Classes:</strong> ${response.classes_count}</div>
-              <div><strong>Properties:</strong> ${response.properties_count}</div>
+              <div><strong>Object Properties:</strong> ${response.object_properties_count}</div>
+              <div><strong>Datatype Properties:</strong> ${response.datatype_properties_count}</div>
+              <div><strong>Total Properties:</strong> ${response.properties_count}</div>
               <div><strong>Namespaces:</strong> ${response.namespaces_count}</div>
               <div><strong>File Size:</strong> ${(response.file_size / 1024).toFixed(1)} KB</div>
             </div>

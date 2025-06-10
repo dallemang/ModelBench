@@ -491,15 +491,31 @@ def load_rdf_file(file_path):
         # Count namespaces
         namespaces = dict(main_graph.namespaces())
         
-        # Look for ontology classes and properties in the main graph
-        classes = set(main_graph.subjects(RDF.type, OWL.Class)) | set(main_graph.subjects(RDF.type, RDFS.Class))
-        properties = set(main_graph.subjects(RDF.type, OWL.ObjectProperty)) | \
-                    set(main_graph.subjects(RDF.type, OWL.DatatypeProperty)) | \
-                    set(main_graph.subjects(RDF.type, RDF.Property))
+        # Look for ontology classes and properties in all graphs in the dataset
+        classes = set()
+        object_properties = set()
+        datatype_properties = set()
         
-        # Load imports recursively
+        # Load imports recursively first so we have the full dataset
         print(f"Loading imports for {base_uri}...", file=sys.stderr)
         import_results = load_imports_recursive(dataset, file_path, base_uri)
+        
+        # Now count classes and properties from all graphs in the dataset
+        for graph in dataset.graphs():
+            # Collect classes (owl:Class and rdfs:Class)
+            graph_classes = set(graph.subjects(RDF.type, OWL.Class)) | set(graph.subjects(RDF.type, RDFS.Class))
+            classes.update({cls for cls in graph_classes if not isinstance(cls, BNode)})
+            
+            # Collect object properties
+            graph_obj_props = set(graph.subjects(RDF.type, OWL.ObjectProperty))
+            object_properties.update({prop for prop in graph_obj_props if not isinstance(prop, BNode)})
+            
+            # Collect datatype properties
+            graph_data_props = set(graph.subjects(RDF.type, OWL.DatatypeProperty))
+            datatype_properties.update({prop for prop in graph_data_props if not isinstance(prop, BNode)})
+        
+        # Combine all properties for backward compatibility
+        properties = object_properties | datatype_properties
         
         # Count total graphs and triples in dataset
         total_graphs = len(list(dataset.graphs()))
@@ -535,6 +551,8 @@ def load_rdf_file(file_path):
             "namespaces": {str(prefix): str(namespace) for prefix, namespace in namespaces.items()},
             "classes_count": len(classes),
             "properties_count": len(properties),
+            "object_properties_count": len(object_properties),
+            "datatype_properties_count": len(datatype_properties),
             "classes": [str(cls) for cls in list(classes)[:10]],  # First 10 classes
             "properties": [str(prop) for prop in list(properties)[:10]],  # First 10 properties
             "class_hierarchy": class_hierarchy,

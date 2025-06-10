@@ -69,15 +69,23 @@ export function repositionOrphansNearConnections(layout, edges, nodes) {
       edge.data.source, edge.data.target
     ]).filter(uri => uri !== orphanUri);
     
-    // If orphan is connected to exactly one other node, reposition it
-    if (connectedNodeUris.length === 1) {
-      const connectedUri = connectedNodeUris[0];
-      const connectedPos = updatedLayout[connectedUri];
+    // If orphan has any connections, reposition it near the average position
+    if (connectedNodeUris.length > 0) {
+      // Get positions of all connected nodes
+      const connectedPositions = connectedNodeUris
+        .map(uri => updatedLayout[uri])
+        .filter(pos => pos !== undefined);
       
-      if (connectedPos) {
-        // Find a good position near the connected node
+      if (connectedPositions.length > 0) {
+        // Calculate average position of all connected nodes
+        const averagePos = {
+          x: connectedPositions.reduce((sum, pos) => sum + pos.x, 0) / connectedPositions.length,
+          y: connectedPositions.reduce((sum, pos) => sum + pos.y, 0) / connectedPositions.length
+        };
+        
+        // Find a good position near the average position
         const newPos = findAvailablePositionNear(
-          connectedPos, 
+          averagePos, 
           updatedLayout, 
           orphanUri
         );
@@ -85,6 +93,9 @@ export function repositionOrphansNearConnections(layout, edges, nodes) {
       }
     }
   });
+  
+  // Post-process: spread out orphans that are too close to each other
+  spreadOrphansApart(updatedLayout, orphanNodes);
   
   return updatedLayout;
 }
@@ -221,4 +232,63 @@ export function calculateTreeLayout(rootNode, rootX, rootY, angle) {
   assignPositions(rootNode, rootX, rootY, 0, rootSubtreeWidth);
   
   return positions;
+}
+
+/**
+ * Spread orphaned nodes apart if they're too close to each other
+ * @param {Object} layout - Layout positions keyed by node URI
+ * @param {Array} orphanNodes - Array of orphan node objects
+ */
+function spreadOrphansApart(layout, orphanNodes) {
+  const minOrphanDistance = 160; // Minimum distance between orphan centers
+  const maxIterations = 5; // Prevent infinite loops
+  
+  for (let iteration = 0; iteration < maxIterations; iteration++) {
+    let moved = false;
+    
+    // Check each pair of orphans
+    for (let i = 0; i < orphanNodes.length; i++) {
+      for (let j = i + 1; j < orphanNodes.length; j++) {
+        const orphan1Uri = orphanNodes[i].data.id;
+        const orphan2Uri = orphanNodes[j].data.id;
+        
+        const pos1 = layout[orphan1Uri];
+        const pos2 = layout[orphan2Uri];
+        
+        if (!pos1 || !pos2) continue;
+        
+        // Calculate distance between orphans
+        const dx = pos2.x - pos1.x;
+        const dy = pos2.y - pos1.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // If they're too close, push them apart
+        if (distance < minOrphanDistance && distance > 0) {
+          // Calculate push direction (unit vector)
+          const pushX = dx / distance;
+          const pushY = dy / distance;
+          
+          // Calculate how much to move each node (half the needed separation)
+          const pushDistance = (minOrphanDistance - distance) / 2;
+          
+          // Move orphan2 away from orphan1
+          layout[orphan2Uri] = {
+            x: pos2.x + pushX * pushDistance,
+            y: pos2.y + pushY * pushDistance
+          };
+          
+          // Move orphan1 away from orphan2
+          layout[orphan1Uri] = {
+            x: pos1.x - pushX * pushDistance,
+            y: pos1.y - pushY * pushDistance
+          };
+          
+          moved = true;
+        }
+      }
+    }
+    
+    // If no orphans were moved in this iteration, we're done
+    if (!moved) break;
+  }
 }

@@ -39,6 +39,115 @@ export function calculateHierarchicalLayout(hierarchy) {
 }
 
 /**
+ * Post-process layout to reposition orphaned nodes near their connected nodes
+ * @param {Object} layout - Current layout positions keyed by node URI
+ * @param {Array} edges - Array of edge objects with source/target data
+ * @param {Array} nodes - Array of node objects with category data
+ * @returns {Object} Updated layout positions
+ */
+export function repositionOrphansNearConnections(layout, edges, nodes) {
+  // Find orphaned nodes (foster orphans with graph_source="property_range")
+  const orphanNodes = nodes.filter(node => 
+    node.data.graph_source === 'property_range' || 
+    node.data.category === 'orphaned'
+  );
+  
+  if (orphanNodes.length === 0) return layout;
+  
+  const updatedLayout = { ...layout };
+  
+  orphanNodes.forEach(orphanNode => {
+    const orphanUri = orphanNode.data.id;
+    
+    // Find all edges connected to this orphan
+    const connectedEdges = edges.filter(edge => 
+      edge.data.source === orphanUri || edge.data.target === orphanUri
+    );
+    
+    // Get the URIs of connected nodes (excluding the orphan itself)
+    const connectedNodeUris = connectedEdges.flatMap(edge => [
+      edge.data.source, edge.data.target
+    ]).filter(uri => uri !== orphanUri);
+    
+    // If orphan is connected to exactly one other node, reposition it
+    if (connectedNodeUris.length === 1) {
+      const connectedUri = connectedNodeUris[0];
+      const connectedPos = updatedLayout[connectedUri];
+      
+      if (connectedPos) {
+        // Find a good position near the connected node
+        const newPos = findAvailablePositionNear(
+          connectedPos, 
+          updatedLayout, 
+          orphanUri
+        );
+        updatedLayout[orphanUri] = newPos;
+      }
+    }
+  });
+  
+  return updatedLayout;
+}
+
+/**
+ * Find an available position near a target position, avoiding collisions
+ * @param {Object} targetPos - Target position {x, y}
+ * @param {Object} layout - Current layout positions
+ * @param {string} excludeUri - URI to exclude from collision checking
+ * @returns {Object} Available position {x, y}
+ */
+function findAvailablePositionNear(targetPos, layout, excludeUri) {
+  const nodeWidth = 120;
+  const nodeHeight = 40;
+  const minDistance = 160; // Minimum distance between node centers
+  
+  // Try positions in a spiral pattern around the target
+  const attempts = [
+    { x: minDistance, y: 0 },           // Right
+    { x: -minDistance, y: 0 },          // Left  
+    { x: 0, y: minDistance },           // Below
+    { x: 0, y: -minDistance },          // Above
+    { x: minDistance, y: minDistance }, // Bottom-right
+    { x: -minDistance, y: minDistance }, // Bottom-left
+    { x: minDistance, y: -minDistance }, // Top-right
+    { x: -minDistance, y: -minDistance }, // Top-left
+    { x: minDistance * 1.5, y: 0 },     // Further right
+    { x: -minDistance * 1.5, y: 0 },    // Further left
+    { x: 0, y: minDistance * 1.5 },     // Further below
+    { x: 0, y: -minDistance * 1.5 }     // Further above
+  ];
+  
+  for (const offset of attempts) {
+    const candidatePos = {
+      x: targetPos.x + offset.x,
+      y: targetPos.y + offset.y
+    };
+    
+    // Check if this position collides with any existing nodes
+    const hasCollision = Object.entries(layout).some(([uri, pos]) => {
+      if (uri === excludeUri) return false;
+      
+      const distance = Math.sqrt(
+        Math.pow(candidatePos.x - pos.x, 2) + 
+        Math.pow(candidatePos.y - pos.y, 2)
+      );
+      
+      return distance < minDistance;
+    });
+    
+    if (!hasCollision) {
+      return candidatePos;
+    }
+  }
+  
+  // If all positions are taken, use the first one anyway (right side)
+  return {
+    x: targetPos.x + minDistance,
+    y: targetPos.y
+  };
+}
+
+/**
  * Calculate layout for a single tree growing outward from a root position
  * @param {Object} rootNode - The root node of the tree
  * @param {number} rootX - X position of the root

@@ -3,6 +3,7 @@
  */
 
 import { calculateRingMatrixLayout, groupNodesByGraph } from './ring-layout.js';
+import { repositionOrphansNearConnections } from './layout.js';
 import { assignColorsToGraphs, categorizeNode, getNodeColor } from './color-utils.js';
 
 /**
@@ -38,7 +39,7 @@ export function buildCytoscapeDataWithRings(hierarchy) {
   const graphColorMap = assignColorsToGraphs(hierarchy);
   
   // Calculate ring matrix layout positions
-  const layoutPositions = calculateRingMatrixLayout(hierarchy, graphNodes);
+  let layoutPositions = calculateRingMatrixLayout(hierarchy, graphNodes);
   
   // Recursively process hierarchy to collect all classes
   function processNode(node) {
@@ -151,6 +152,17 @@ export function buildCytoscapeDataWithRings(hierarchy) {
   
   // Process all root nodes
   hierarchy.forEach(processNode);
+  
+  // Post-process: reposition orphans near their connected nodes
+  layoutPositions = repositionOrphansNearConnections(layoutPositions, edges, nodes);
+  
+  // Update node positions with the repositioned layout
+  nodes.forEach(node => {
+    const newPosition = layoutPositions[node.data.id];
+    if (newPosition) {
+      node.position = newPosition;
+    }
+  });
   
   return { nodes, edges, graphNodes, graphColorMap };
 }

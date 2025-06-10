@@ -2,7 +2,7 @@
  * Builds Cytoscape graph data from class hierarchy
  */
 
-import { calculateHierarchicalLayout } from './layout.js';
+import { calculateHierarchicalLayout, repositionOrphansNearConnections } from './layout.js';
 import { assignColorsToGraphs, categorizeNode, getNodeColor } from './color-utils.js';
 
 
@@ -35,7 +35,7 @@ export function buildCytoscapeData(hierarchy) {
   const graphColorMap = window.currentGraphColorMap || assignColorsToGraphs(hierarchy);
   
   // Calculate custom layout positions
-  const layoutPositions = calculateHierarchicalLayout(hierarchy);
+  let layoutPositions = calculateHierarchicalLayout(hierarchy);
   
   // Recursively process hierarchy to collect all classes
   function processNode(node) {
@@ -145,6 +145,17 @@ export function buildCytoscapeData(hierarchy) {
   
   // Process all root nodes
   hierarchy.forEach(processNode);
+  
+  // Post-process: reposition orphans near their connected nodes
+  layoutPositions = repositionOrphansNearConnections(layoutPositions, edges, nodes);
+  
+  // Update node positions with the repositioned layout
+  nodes.forEach(node => {
+    const newPosition = layoutPositions[node.data.id];
+    if (newPosition) {
+      node.position = newPosition;
+    }
+  });
   
   return { nodes, edges, graphColorMap };
 }

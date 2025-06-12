@@ -161,135 +161,100 @@ def build_debug_tree(hierarchy):
     
     return result
 
-def build_class_hierarchy_from_dataset(dataset):
-    """Build a hierarchical tree structure of classes from all graphs in dataset"""
-    # Collect classes and relationships from all graphs in the dataset
-    all_classes = set()
+def build_hierarchy(dataset, types, rel):
+    """Build a hierarchical tree structure from all graphs in dataset
+    
+    Args:
+        dataset: RDF dataset containing graphs
+        types: Array of RDF types to collect (e.g., [OWL.Class, RDFS.Class])
+        rel: Relationship predicate to use for hierarchy (e.g., RDFS.subClassOf)
+    """
+    # Collect entities and relationships from all graphs in the dataset
+    all_entities = set()
     hierarchy = {}
     
-    # First pass: collect all classes from all graphs
+    # First pass: collect all entities of specified types from all graphs
     for graph in dataset.graphs():
-        graph_classes = set(graph.subjects(RDF.type, OWL.Class)) | set(graph.subjects(RDF.type, RDFS.Class))
-        all_classes.update({cls for cls in graph_classes if not isinstance(cls, BNode)})
+        for entity_type in types:
+            graph_entities = set(graph.subjects(RDF.type, entity_type))
+            all_entities.update({ent for ent in graph_entities if not isinstance(ent, BNode)})
     
-    # Build hierarchy entries for all classes
-    for cls in all_classes:
-        cls_str = str(cls)
+    # Build hierarchy entries for all entities
+    for entity in all_entities:
+        entity_str = str(entity)
         # Find the best label and identify source graph
         label = None
         properties = []
         graph_source = None
         
         for graph in dataset.graphs():
-            # Check if this class is defined in this graph
-            if (cls, RDF.type, OWL.Class) in graph or (cls, RDF.type, RDFS.Class) in graph:
+            # Check if this entity is defined in this graph
+            entity_defined = False
+            for entity_type in types:
+                if (entity, RDF.type, entity_type) in graph:
+                    entity_defined = True
+                    break
+            
+            if entity_defined:
                 if graph_source is None:
                     graph_source = str(graph.identifier)
                 if label is None:
-                    label = get_label(graph, cls)
-            # Collect properties from all graphs
-            properties.extend(get_class_properties(graph, cls_str))
+                    label = get_label(graph, entity)
+            # Collect properties from all graphs (only for classes)
+            if OWL.Class in types or RDFS.Class in types:
+                properties.extend(get_class_properties(graph, entity_str))
         
-        hierarchy[cls_str] = {
-            "uri": cls_str,
-            "label": label or cls_str.split('#')[-1].split('/')[-1],
+        hierarchy[entity_str] = {
+            "uri": entity_str,
+            "label": label or entity_str.split('#')[-1].split('/')[-1],
             "children": [],
             "properties": properties,
             "graph_source": graph_source or "unknown"
         }
         
     
-    # Second pass: collect subclass relationships from all graphs
-    roots = set(all_classes)  # Start with all classes as potential roots
+    # Second pass: collect relationships from all graphs
+    roots = set(all_entities)  # Start with all entities as potential roots
     
     for graph in dataset.graphs():
-        for cls in all_classes:
-            cls_str = str(cls)
-            # Look for rdfs:subClassOf relationships in this graph
-            parents = list(graph.objects(cls, RDFS.subClassOf))
+        for entity in all_entities:
+            entity_str = str(entity)
+            # Look for the specified relationship in this graph
+            parents = list(graph.objects(entity, rel))
             
             # Filter out owl:Thing and blank nodes as parents
             meaningful_parents = [p for p in parents if str(p) != str(OWL.Thing) and not isinstance(p, BNode)]
             
             if meaningful_parents:
-                roots.discard(cls)  # Remove from roots if it has parents
+                roots.discard(entity)  # Remove from roots if it has parents
                 for parent in meaningful_parents:
                     parent_str = str(parent)
-                    if parent_str in hierarchy and cls_str in hierarchy:
+                    if parent_str in hierarchy and entity_str in hierarchy:
                         # Avoid duplicates
-                        if hierarchy[cls_str] not in hierarchy[parent_str]["children"]:
-                            hierarchy[parent_str]["children"].append(hierarchy[cls_str])
+                        if hierarchy[entity_str] not in hierarchy[parent_str]["children"]:
+                            hierarchy[parent_str]["children"].append(hierarchy[entity_str])
     
-    # Sort children alphabetically for each class
+    # Sort children alphabetically for each entity
     def sort_hierarchy(node):
         if node["children"]:
             node["children"].sort(key=lambda x: x["label"].lower())
             for child in node["children"]:
                 sort_hierarchy(child)
     
-    # Get root classes and sort them
-    root_classes = [hierarchy[str(root)] for root in roots if str(root) in hierarchy]
-    root_classes.sort(key=lambda x: x["label"].lower())
+    # Get root entities and sort them
+    root_entities = [hierarchy[str(root)] for root in roots if str(root) in hierarchy]
+    root_entities.sort(key=lambda x: x["label"].lower())
     
     # Sort all children recursively
-    for root in root_classes:
+    for root in root_entities:
         sort_hierarchy(root)
     
-    return root_classes
+    return root_entities
 
-def build_class_hierarchy(graph):
-    """Build a hierarchical tree structure of classes using rdfs:subClassOf"""
-    # Find all classes, excluding blank nodes
-    all_classes = set(graph.subjects(RDF.type, OWL.Class)) | set(graph.subjects(RDF.type, RDFS.Class))
-    classes = {cls for cls in all_classes if not isinstance(cls, BNode)}
-    
-    # Build parent-child relationships
-    hierarchy = {}
-    roots = set()
-    
-    for cls in classes:
-        cls_str = str(cls)
-        hierarchy[cls_str] = {
-            "uri": cls_str,
-            "label": get_label(graph, cls),
-            "children": [],
-            "properties": get_class_properties(graph, cls_str)
-        }
-    
-    # Find subclass relationships
-    for cls in classes:
-        cls_str = str(cls)
-        # Look for rdfs:subClassOf relationships
-        parents = list(graph.objects(cls, RDFS.subClassOf))
-        
-        # Filter out owl:Thing and blank nodes as parents
-        meaningful_parents = [p for p in parents if str(p) != str(OWL.Thing) and not isinstance(p, BNode)]
-        
-        if meaningful_parents:
-            for parent in meaningful_parents:
-                parent_str = str(parent)
-                if parent_str in hierarchy:
-                    hierarchy[parent_str]["children"].append(hierarchy[cls_str])
-        else:
-            # No meaningful parent found (only owl:Thing or no parents), this is a root class
-            roots.add(cls_str)
-    
-    # Sort children alphabetically for each class
-    def sort_hierarchy(node):
-        if node["children"]:
-            node["children"].sort(key=lambda x: x["label"].lower())
-            for child in node["children"]:
-                sort_hierarchy(child)
-    
-    # Get root classes and sort them
-    root_classes = [hierarchy[root] for root in roots if root in hierarchy]
-    root_classes.sort(key=lambda x: x["label"].lower())
-    
-    # Sort all children recursively
-    for root in root_classes:
-        sort_hierarchy(root)
-    
-    return root_classes
+def build_class_hierarchy_from_dataset(dataset):
+    """Build a hierarchical tree structure of classes from all graphs in dataset"""
+    return build_hierarchy(dataset, [OWL.Class, RDFS.Class], RDFS.subClassOf)
+
 
 def get_label(graph, resource):
     """Get the label for a resource, falling back to local name"""

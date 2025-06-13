@@ -21,13 +21,17 @@ from main import (
     find_base_uri_from_graph,
     find_base_uri,
     load_into_dataset_with_base_detection,
-    get_class_properties,
-    build_class_hierarchy_from_dataset,
-    build_import_hierarchy_from_dataset,
-    get_label,
     find_owl_imports,
     resolve_relative_import_path,
     load_imports_recursive
+)
+
+# Import hierarchy functions from hierarchy.py
+from hierarchy import (
+    build_class_hierarchy_from_dataset,
+    build_import_hierarchy_from_dataset,
+    get_label,
+    get_class_properties
 )
 
 # Global dataset storage (persistent across requests)

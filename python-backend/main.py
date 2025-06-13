@@ -140,44 +140,27 @@ def get_class_properties(graph, class_uri):
     
     return properties
 
-def build_debug_tree(hierarchy):
-    """Build a simple tree structure for debugging display"""
-    result = []
-    
-    def process_node(node, level=0):
-        indent = "  " * level
-        children_info = []
-        for child in node.get("children", []):
-            children_info.extend(process_node(child, level + 1))
-        
-        node_info = f"{indent}{node['label']}"
-        if node.get("children"):
-            node_info += f" ({len(node['children'])} children)"
-        
-        return [node_info] + children_info
-    
-    for root in hierarchy:
-        result.extend(process_node(root))
-    
-    return result
 
-def build_hierarchy(dataset, types, rel):
+def build_hierarchy(dataset, types, rel, object_on_top=True):
     """Build a hierarchical tree structure from all graphs in dataset
     
     Args:
         dataset: RDF dataset containing graphs
         types: Array of RDF types to collect (e.g., [OWL.Class, RDFS.Class])
         rel: Relationship predicate to use for hierarchy (e.g., RDFS.subClassOf)
+        object_on_top: If True, objects of rel are parents (default). If False, subjects are parents.
     """
     # Collect entities and relationships from all graphs in the dataset
     all_entities = set()
     hierarchy = {}
     
-    # First pass: collect all entities of specified types from all graphs
-    for graph in dataset.graphs():
-        for entity_type in types:
-            graph_entities = set(graph.subjects(RDF.type, entity_type))
-            all_entities.update({ent for ent in graph_entities if not isinstance(ent, BNode)})
+    # First pass: collect all entities of specified types from the federated dataset
+    for entity_type in types:
+        dataset_entities = {
+            s for s, _, _, _ in dataset.quads((None, RDF.type, entity_type, None))
+        }
+
+        all_entities.update({ent for ent in dataset_entities if not isinstance(ent, BNode)})
     
     # Build hierarchy entries for all entities
     for entity in all_entities:
@@ -213,26 +196,57 @@ def build_hierarchy(dataset, types, rel):
         }
         
     
-    # Second pass: collect relationships from all graphs
+    # Second pass: collect relationships from the entire dataset
     roots = set(all_entities)  # Start with all entities as potential roots
     
-    for graph in dataset.graphs():
-        for entity in all_entities:
-            entity_str = str(entity)
-            # Look for the specified relationship in this graph
-            parents = list(graph.objects(entity, rel))
-            
-            # Filter out owl:Thing and blank nodes as parents
-            meaningful_parents = [p for p in parents if str(p) != str(OWL.Thing) and not isinstance(p, BNode)]
-            
-            if meaningful_parents:
+    for entity in all_entities:
+        entity_str = str(entity)
+        
+        # Look for the specified relationship in the entire dataset
+        related_entities = [
+            o for _, _, o, _ in dataset.quads((entity, rel, None, None))
+        ]
+        
+        # Filter out owl:Thing and blank nodes
+        meaningful_related = [r for r in related_entities if str(r) != str(OWL.Thing) and not isinstance(r, BNode)]
+        
+        if meaningful_related:
+            if object_on_top:
+                # Traditional hierarchy: objects are parents of subjects
                 roots.discard(entity)  # Remove from roots if it has parents
-                for parent in meaningful_parents:
+                for parent in meaningful_related:
                     parent_str = str(parent)
-                    if parent_str in hierarchy and entity_str in hierarchy:
+                    # Create parent entry if it doesn't exist
+                    if parent_str not in hierarchy:
+                        hierarchy[parent_str] = {
+                            "uri": parent_str,
+                            "label": parent_str.split('#')[-1].split('/')[-1],
+                            "children": [],
+                            "properties": [],
+                            "graph_source": "unknown"
+                        }
+                    if entity_str in hierarchy:
                         # Avoid duplicates
                         if hierarchy[entity_str] not in hierarchy[parent_str]["children"]:
                             hierarchy[parent_str]["children"].append(hierarchy[entity_str])
+            else:
+                # Reverse hierarchy: subjects are parents of objects
+                for child in meaningful_related:
+                    child_str = str(child)
+                    roots.discard(child)  # Remove children from roots
+                    # Create child entry if it doesn't exist
+                    if child_str not in hierarchy:
+                        hierarchy[child_str] = {
+                            "uri": child_str,
+                            "label": child_str.split('#')[-1].split('/')[-1],
+                            "children": [],
+                            "properties": [],
+                            "graph_source": "unknown"
+                        }
+                    if entity_str in hierarchy:
+                        # Avoid duplicates
+                        if hierarchy[child_str] not in hierarchy[entity_str]["children"]:
+                            hierarchy[entity_str]["children"].append(hierarchy[child_str])
     
     # Sort children alphabetically for each entity
     def sort_hierarchy(node):
@@ -253,7 +267,11 @@ def build_hierarchy(dataset, types, rel):
 
 def build_class_hierarchy_from_dataset(dataset):
     """Build a hierarchical tree structure of classes from all graphs in dataset"""
-    return build_hierarchy(dataset, [OWL.Class, RDFS.Class], RDFS.subClassOf)
+    return build_hierarchy(dataset, [OWL.Class, RDFS.Class], RDFS.subClassOf, object_on_top=True)
+
+def build_import_hierarchy_from_dataset(dataset):
+    """Build a hierarchical tree structure of ontology imports from all graphs in dataset"""
+    return build_hierarchy(dataset, [OWL.Ontology], OWL.imports, object_on_top=False)
 
 
 def get_label(graph, resource):
@@ -522,10 +540,6 @@ def load_rdf_file(file_path):
             "properties": [str(prop) for prop in list(properties)[:10]],  # First 10 properties
             "class_hierarchy": class_hierarchy,
             "subclass_relationships_count": subclass_count,
-            "hierarchy_debug": {
-                "root_classes": [{"label": root["label"], "children_count": len(root.get("children", []))} for root in class_hierarchy],
-                "full_hierarchy_tree": build_debug_tree(class_hierarchy)
-            },
             "imports": import_results,
             "imports_count": len(import_results),
             "loaded_graphs": [str(g.identifier) for g in dataset.graphs()],

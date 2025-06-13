@@ -41,9 +41,10 @@ export function getNamespaces() {
  * Build tree HTML from hierarchy data
  * @param {Array} nodes - Array of hierarchy nodes
  * @param {Object} graphColorMap - Required pre-calculated color mapping
+ * @param {string} selectionType - Type of selection ('class' or 'ontology')
  * @returns {string} HTML string for the tree
  */
-export function buildTreeHtml(nodes, graphColorMap, rootNodeUris = null, descendantOfRootUris = null) {
+export function buildTreeHtml(nodes, graphColorMap, selectionType = 'class', rootNodeUris = null, descendantOfRootUris = null) {
   if (!nodes || nodes.length === 0) return '';
   
   // Color map should ALWAYS be provided - no fallback calculation
@@ -78,15 +79,18 @@ export function buildTreeHtml(nodes, graphColorMap, rootNodeUris = null, descend
     
     const hasChildren = node.children && node.children.length > 0;
     const toggleSymbol = hasChildren ? '▶' : '•';
-    const childrenHtml = hasChildren ? buildTreeHtml(node.children, currentGraphColorMap, currentRootNodeUris, currentDescendantOfRootUris) : '';
+    const childrenHtml = hasChildren ? buildTreeHtml(node.children, currentGraphColorMap, selectionType, currentRootNodeUris, currentDescendantOfRootUris) : '';
     
     // Get the appropriate text color for this node
     const textColor = getNodeColor(node, currentGraphColorMap, currentRootNodeUris, currentDescendantOfRootUris, true, "HIERARCHY");
     
+    // Determine which selection function to use
+    const clickFunction = selectionType === 'ontology' ? 'selectOntology' : 'selectClass';
+    
     return `
       <div class="tree-node">
         <span class="tree-toggle" onclick="toggleNode(this)">${toggleSymbol}</span>
-        <span class="tree-label" title="${node.uri}" onclick="selectClass('${node.uri}')" style="color: ${textColor}; font-weight: bold;">${node.label}</span>
+        <span class="tree-label" title="${node.uri}" onclick="${clickFunction}('${node.uri}')" style="color: ${textColor}; font-weight: bold;">${node.label}</span>
         ${hasChildren ? `<div class="tree-children collapsed">${childrenHtml}</div>` : ''}
       </div>
     `;
@@ -111,6 +115,22 @@ export function selectClass(classUri) {
   
   // Show class details
   showClassDetails(classData[classUri]);
+}
+
+export function selectOntology(ontologyUri) {
+  // Remove selection from all labels
+  document.querySelectorAll('.tree-label').forEach(label => {
+    label.classList.remove('selected');
+  });
+  
+  // Add selection to clicked label
+  const clickedLabel = document.querySelector(`[onclick="selectOntology('${ontologyUri}')"]`);
+  if (clickedLabel) {
+    clickedLabel.classList.add('selected');
+  }
+  
+  // Show ontology details
+  showOntologyDetails(classData[ontologyUri]);
 }
 
 /**
@@ -183,6 +203,38 @@ export function showClassDetails(classInfo) {
         <p><strong>QName:</strong> <code style="word-break: break-all;" title="${classInfo.uri}">${classQname}</code></p>
         <h3>Properties</h3>
         ${propertiesHtml}
+      </div>
+    </div>
+  `;
+}
+
+export function showOntologyDetails(ontologyInfo) {
+  const detailsContainer = document.getElementById('ontology-details');
+  
+  if (!ontologyInfo) {
+    detailsContainer.innerHTML = `
+      <div class="no-selection">
+        <p>Ontology not found</p>
+      </div>
+    `;
+    return;
+  }
+  
+  const ontologyQname = uriToQname(ontologyInfo.uri);
+  
+  // Show basic ontology information
+  detailsContainer.innerHTML = `
+    <div class="class-form active">
+      <h2 title="${ontologyInfo.uri}">${ontologyInfo.label}</h2>
+      <div class="class-info">
+        <p><strong>QName:</strong> <code style="word-break: break-all;" title="${ontologyInfo.uri}">${ontologyQname}</code></p>
+        <p><strong>Graph Source:</strong> <code>${ontologyInfo.graph_source}</code></p>
+        ${ontologyInfo.children && ontologyInfo.children.length > 0 ? `
+          <h3>Imports (${ontologyInfo.children.length})</h3>
+          <div class="property-values">
+            ${ontologyInfo.children.map(child => `<div>${child.label} (${child.uri})</div>`).join('')}
+          </div>
+        ` : '<p><em>No imports found</em></p>'}
       </div>
     </div>
   `;

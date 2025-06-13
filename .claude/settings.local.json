@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm create:*)",
       "Bash(mkdir:*)",
-      "Bash(rg:*)"
+      "Bash(rg:*)",
+      "Bash(npm run tauri:*)"
     ],
     "deny": []
   },

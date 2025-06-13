@@ -320,6 +320,7 @@
       <div class="tab-container" id="tab-container" style="display: none;">
         <div class="tab-nav">
           <button class="tab-button active" onclick="switchTab('hierarchy')">Class Hierarchy</button>
+          <button class="tab-button" onclick="switchTab('import-hierarchy')">Import Hierarchy</button>
           <button class="tab-button" onclick="switchTab('diagram')">Class Diagram</button>
           <button class="tab-button" onclick="switchTab('log')">Log</button>
         </div>
@@ -337,6 +338,23 @@
                 <div id="class-details">
                   <div class="no-selection">
                     <p>Select a class from the hierarchy to view its details</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Import Hierarchy Tab -->
+          <div id="tab-import-hierarchy" class="tab-pane">
+            <div class="split-panel">
+              <div class="left-panel">
+                <h3>Import Hierarchy</h3>
+                <div id="import-hierarchy-tree" class="tree"></div>
+              </div>
+              <div class="right-panel">
+                <div id="ontology-details">
+                  <div class="no-selection">
+                    <p>Select an ontology from the hierarchy to view its details</p>
                   </div>
                 </div>
               </div>

@@ -22,8 +22,8 @@ from main import (
     find_base_uri,
     load_into_dataset_with_base_detection,
     get_class_properties,
-    build_debug_tree,
     build_class_hierarchy_from_dataset,
+    build_import_hierarchy_from_dataset,
     get_label,
     find_owl_imports,
     resolve_relative_import_path,
@@ -151,10 +151,6 @@ def load_rdf_file_endpoint(request: LoadRdfRequest):
             "properties": [str(prop) for prop in list(properties)[:10]],
             "class_hierarchy": class_hierarchy,
             "subclass_relationships_count": subclass_count,
-            "hierarchy_debug": {
-                "root_classes": [{"label": root["label"], "children_count": len(root.get("children", []))} for root in class_hierarchy],
-                "full_hierarchy_tree": build_debug_tree(class_hierarchy)
-            },
             "imports": import_results,
             "imports_count": len(import_results),
             "loaded_graphs": [str(g.identifier) for g in dataset.graphs()],
@@ -262,6 +258,26 @@ def get_current_hierarchy():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get hierarchy: {str(e)}")
+
+@app.get("/import_hierarchy")
+def get_current_import_hierarchy():
+    """Get the current import hierarchy from the dataset"""
+    global current_dataset
+    
+    if current_dataset is None:
+        raise HTTPException(status_code=400, detail="No dataset currently loaded")
+    
+    try:
+        # Build and return the current import hierarchy
+        current_import_hierarchy = build_import_hierarchy_from_dataset(current_dataset)
+        
+        return {
+            "success": True,
+            "hierarchy": current_import_hierarchy
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get import hierarchy: {str(e)}")
 
 @app.get("/resolve_import_path")
 def resolve_import_path_endpoint(base_file_path: str, base_uri: str, import_uri: str):

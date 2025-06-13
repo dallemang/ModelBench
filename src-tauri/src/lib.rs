@@ -170,6 +170,12 @@ async fn get_hierarchy() -> Result<HttpResponse, String> {
     Ok(HttpResponse { data: response })
 }
 
+#[tauri::command]
+async fn get_import_hierarchy() -> Result<HttpResponse, String> {
+    let response = make_http_request("GET", "/import_hierarchy", None).await?;
+    Ok(HttpResponse { data: response })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -179,7 +185,8 @@ pub fn run() {
         get_graph_info, 
         query_graph, 
         add_triple, 
-        get_hierarchy
+        get_hierarchy,
+        get_import_hierarchy
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

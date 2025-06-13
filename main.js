@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { createClassDiagram, resetViewportState } from './js/cytoscape-renderer.js';
 import { switchTab, resetLayout, fitToScreen, debugDiagramData, toggleLayoutType, setHierarchyData, getCurrentLayoutType } from './js/ui-controls.js';
-import { buildTreeHtml, selectClass, toggleNode, setTreeState, getClassData, getNamespaces } from './js/tree-builder.js';
+import { buildTreeHtml, selectClass, selectOntology, toggleNode, setTreeState, getClassData, getNamespaces } from './js/tree-builder.js';
 import { assignColorsToGraphs } from './js/color-utils.js';
 
 // Helper function to render import details recursively
@@ -167,6 +167,13 @@ async function loadFile() {
           // Now build the hierarchy and diagram by querying the backend
           await buildHierarchyFromBackend();
           
+          // Build import hierarchy but don't let it block the main flow
+          try {
+            await buildImportHierarchyFromBackend();
+          } catch (error) {
+            console.error('Import hierarchy failed, but continuing:', error);
+          }
+          
           // Ensure we start on the hierarchy tab
           switchTab('hierarchy');
         }
@@ -192,6 +199,7 @@ window.loadFile = loadFile;
 window.toggleNode = toggleNode;
 window.switchTab = switchTab;
 window.selectClass = selectClass;
+window.selectOntology = selectOntology;
 window.resetDiagramLayout = resetLayout;
 window.fitDiagram = fitToScreen;
 window.debugDiagramData = debugDiagramData;
@@ -275,8 +283,56 @@ async function buildHierarchyFromBackend() {
   }
 }
 
-// Make the function globally available
+async function buildImportHierarchyFromBackend() {
+  try {
+    console.log('Building import hierarchy from backend...');
+    
+    // Query the backend for current import hierarchy
+    const response = await invoke('get_import_hierarchy');
+    console.log('Import hierarchy response:', response);
+    
+    if (response.success && response.hierarchy) {
+      console.log('Got import hierarchy from backend:', response.hierarchy.length, 'root nodes');
+      
+      if (response.hierarchy.length > 0) {
+        const graphColorMap = assignColorsToGraphs(response.hierarchy);
+        
+        const importHierarchyTree = document.getElementById('import-hierarchy-tree');
+        importHierarchyTree.innerHTML = buildTreeHtml(response.hierarchy, graphColorMap, 'ontology');
+        
+        document.getElementById('ontology-details').innerHTML = `
+          <div class="no-selection">
+            <p>Select an ontology from the hierarchy to view its details</p>
+          </div>
+        `;
+        
+        setHierarchyData(response.hierarchy, 'import');
+        console.log('Import hierarchy tree built successfully');
+      } else {
+        const importHierarchyTree = document.getElementById('import-hierarchy-tree');
+        importHierarchyTree.innerHTML = '<p>No import relationships found in the loaded ontologies.</p>';
+        
+        document.getElementById('ontology-details').innerHTML = `
+          <div class="no-selection">
+            <p>No import hierarchy available</p>
+          </div>
+        `;
+      }
+    } else {
+      console.error('Failed to get import hierarchy from backend:', response);
+      const importHierarchyTree = document.getElementById('import-hierarchy-tree');
+      importHierarchyTree.innerHTML = '<p>Error loading import hierarchy</p>';
+    }
+  } catch (error) {
+    console.error('Error building import hierarchy:', error);
+    const importHierarchyTree = document.getElementById('import-hierarchy-tree');
+    importHierarchyTree.innerHTML = '<p>Error loading import hierarchy</p>';
+  }
+}
+
+// Make the functions globally available
 window.buildHierarchyFromBackend = buildHierarchyFromBackend;
+window.buildImportHierarchyFromBackend = buildImportHierarchyFromBackend;
 
 // Enable hot module replacement for development
 if (import.meta.hot) {

@@ -180,8 +180,7 @@ export function showClassDetails(classInfo) {
       
       return `
         <div class="form-group">
-          <label>${prop.label}</label>
-          <div class="property-qname" style="font-size: 11px; color: #666; margin-bottom: 3px;" title="${prop.uri}">${propQname}</div>
+          <label>${prop.label} <span class="property-qname" style="font-size: 11px; color: #666; margin-left: 8px;" title="${prop.uri}">${propQname}</span></label>
           <div class="property-values ${prop.ranges.length === 0 ? 'empty' : ''}">${rangeValues}</div>
         </div>
       `;

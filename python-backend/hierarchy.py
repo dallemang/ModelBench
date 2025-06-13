@@ -26,7 +26,12 @@ def get_label(graph, resource):
 
 def get_class_properties(graph, class_uri):
     """Get all properties that have the given class as their domain"""
+    from rdflib import URIRef
     properties = []
+    
+    # Ensure class_uri is a URIRef for RDFLib operations
+    if isinstance(class_uri, str):
+        class_uri = URIRef(class_uri)
     
     # Find all properties where this class is the domain
     for prop in graph.subjects(RDFS.domain, class_uri):

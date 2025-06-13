@@ -23,7 +23,10 @@ from main import (
     load_into_dataset_with_base_detection,
     find_owl_imports,
     resolve_relative_import_path,
-    load_imports_recursive
+    load_imports_recursive,
+    clear_namespace_registry,
+    register_namespaces_from_graph,
+    get_global_namespaces
 )
 
 # Import hierarchy functions from hierarchy.py
@@ -69,6 +72,9 @@ def load_rdf_file_endpoint(request: LoadRdfRequest):
         if not os.path.exists(file_path):
             raise HTTPException(status_code=400, detail="File does not exist")
         
+        # Clear namespace registry for new file load
+        clear_namespace_registry()
+        
         # Load into dataset with base URI detection
         dataset, base_uri = load_into_dataset_with_base_detection(file_path)
         
@@ -80,6 +86,9 @@ def load_rdf_file_endpoint(request: LoadRdfRequest):
         # Get the main graph for analysis
         main_graph = dataset.graph(URIRef(base_uri))
         
+        # Register namespaces from the main graph
+        register_namespaces_from_graph(main_graph, f"(main file: {file_path})")
+        
         # Collect basic statistics from the main graph
         triples_count = len(main_graph)
         
@@ -87,9 +96,6 @@ def load_rdf_file_endpoint(request: LoadRdfRequest):
         subjects = set(main_graph.subjects())
         predicates = set(main_graph.predicates())
         objects = set(main_graph.objects())
-        
-        # Count namespaces
-        namespaces = dict(main_graph.namespaces())
         
         # Look for ontology classes and properties in all graphs in the dataset
         classes = set()
@@ -145,8 +151,9 @@ def load_rdf_file_endpoint(request: LoadRdfRequest):
             "subjects_count": len(subjects),
             "predicates_count": len(predicates),
             "objects_count": len(objects),
-            "namespaces_count": len(namespaces),
-            "namespaces": {str(prefix): str(namespace) for prefix, namespace in namespaces.items()},
+            "namespaces_count": len(get_global_namespaces()[0]),
+            "namespaces": get_global_namespaces()[0],
+            "namespace_conflicts": get_global_namespaces()[1],
             "classes_count": len(classes),
             "properties_count": len(properties),
             "object_properties_count": len(object_properties),

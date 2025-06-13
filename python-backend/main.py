@@ -23,6 +23,40 @@ current_dataset = None
 current_file_path = None
 current_base_uri = None
 
+# Global namespace registry (prefix -> namespace_uri)
+global_namespaces = {}
+namespace_conflicts = []  # List of conflict messages
+
+def register_namespaces_from_graph(graph, source_description=""):
+    """Register namespaces from a graph, detecting conflicts"""
+    global global_namespaces, namespace_conflicts
+    
+    for prefix, namespace in graph.namespaces():
+        prefix_str = str(prefix)
+        namespace_str = str(namespace)
+        
+        if prefix_str in global_namespaces:
+            if global_namespaces[prefix_str] != namespace_str:
+                # Conflict detected!
+                conflict_msg = f"Namespace conflict: prefix '{prefix_str}' maps to both '{global_namespaces[prefix_str]}' and '{namespace_str}' {source_description}"
+                namespace_conflicts.append(conflict_msg)
+                print(f"WARNING: {conflict_msg}", file=sys.stderr)
+                # Keep the first definition
+            # else: same prefix->namespace mapping, no problem
+        else:
+            # New prefix, register it
+            global_namespaces[prefix_str] = namespace_str
+
+def clear_namespace_registry():
+    """Clear the global namespace registry (for new file loads)"""
+    global global_namespaces, namespace_conflicts
+    global_namespaces = {}
+    namespace_conflicts = []
+
+def get_global_namespaces():
+    """Get the current global namespace registry"""
+    return global_namespaces, namespace_conflicts
+
 def scan_for_base_declaration(file_path, max_lines=50):
     """Scan file header for @base or @prefix : declarations"""
     try:
@@ -94,31 +128,41 @@ def load_into_dataset_with_base_detection(file_path):
     # 1. First scan header for @base (most authoritative)
     base_uri = scan_for_base_declaration(file_path)
     
-    # 2. Create dataset and parse into temp graph first
+    # 2. Create dataset
     dataset = Dataset()
-    temp_name = URIRef(f"temp://{uuid.uuid4()}")
     
-    try:
-        # Parse into the specific named graph, not the dataset
-        temp_graph = dataset.graph(temp_name)
-        temp_graph.parse(file_path)
-    except Exception as e:
-        raise
-    
-    # 3. If no @base found, look in parsed graph for owl:Ontology
-    if not base_uri:
-        base_uri = find_base_uri_from_graph(temp_graph)
-    
-    # 4. If still no base URI, use file-based fallback
-    if not base_uri:
-        base_uri = f"file://{os.path.abspath(file_path)}"
-    
-    # 5. Move data to correctly named graph
-    final_graph = dataset.graph(URIRef(base_uri))
-    for triple in temp_graph:
-        final_graph.add(triple)
-    
-    dataset.remove_graph(temp_name)
+    if base_uri:
+        # We know the base URI, parse directly into correctly named graph
+        final_graph = dataset.graph(URIRef(base_uri))
+        try:
+            final_graph.parse(file_path)
+        except Exception as e:
+            raise
+    else:
+        # No @base found, need to parse first to find owl:Ontology
+        # Use a temporary approach but minimize memory impact
+        temp_name = URIRef(f"temp://{uuid.uuid4()}")
+        
+        try:
+            temp_graph = dataset.graph(temp_name)
+            temp_graph.parse(file_path)
+            
+            # Find base URI from parsed graph
+            base_uri = find_base_uri_from_graph(temp_graph)
+            
+            # If still no base URI, use file-based fallback
+            if not base_uri:
+                base_uri = f"file://{os.path.abspath(file_path)}"
+            
+            # Move data to correctly named graph
+            final_graph = dataset.graph(URIRef(base_uri))
+            for triple in temp_graph:
+                final_graph.add(triple)
+            
+            dataset.remove_graph(temp_name)
+            
+        except Exception as e:
+            raise
     
     return dataset, base_uri
 
@@ -257,6 +301,9 @@ def load_imports_recursive(dataset, main_file_path, main_base_uri, loaded_uris=N
             import_graph = dataset.graph(URIRef(import_base_uri))
             import_graph.parse(actual_file_path)
             
+            # Register namespaces from the imported graph
+            register_namespaces_from_graph(import_graph, f"(import: {actual_file_path})")
+            
             import_info["status"] = "loaded"
             import_info["triples_count"] = len(import_graph)
             
@@ -283,6 +330,9 @@ def load_rdf_file(file_path):
         if not os.path.exists(file_path):
             return {"error": "File does not exist"}
         
+        # Clear namespace registry for new file load
+        clear_namespace_registry()
+        
         # Load into dataset with base URI detection
         dataset, base_uri = load_into_dataset_with_base_detection(file_path)
         
@@ -294,6 +344,8 @@ def load_rdf_file(file_path):
         # Get the main graph for analysis (the specific named graph, not the dataset)
         main_graph = dataset.graph(URIRef(base_uri))
         
+        # Register namespaces from the main graph
+        register_namespaces_from_graph(main_graph, f"(main file: {file_path})")
         
         # For hierarchy building, we want to query the combined dataset
         # but for basic stats, we use the main graph
@@ -305,9 +357,6 @@ def load_rdf_file(file_path):
         subjects = set(main_graph.subjects())
         predicates = set(main_graph.predicates())
         objects = set(main_graph.objects())
-        
-        # Count namespaces
-        namespaces = dict(main_graph.namespaces())
         
         # Look for ontology classes and properties in all graphs in the dataset
         classes = set()
@@ -365,8 +414,9 @@ def load_rdf_file(file_path):
             "subjects_count": len(subjects),
             "predicates_count": len(predicates),
             "objects_count": len(objects),
-            "namespaces_count": len(namespaces),
-            "namespaces": {str(prefix): str(namespace) for prefix, namespace in namespaces.items()},
+            "namespaces_count": len(global_namespaces),
+            "namespaces": global_namespaces,
+            "namespace_conflicts": namespace_conflicts,
             "classes_count": len(classes),
             "properties_count": len(properties),
             "object_properties_count": len(object_properties),

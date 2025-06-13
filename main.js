@@ -118,6 +118,14 @@ async function loadFile() {
                 ).join('')}
               </div>
             ` : ''}
+            ${response.namespace_conflicts && response.namespace_conflicts.length > 0 ? `
+              <h4 style="color: #dc3545;">⚠ Namespace Conflicts</h4>
+              <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px; margin: 10px 0;">
+                ${response.namespace_conflicts.map(conflict => 
+                  `<div style="color: #721c24; margin: 5px 0; font-family: monospace; font-size: 13px;"><strong>WARNING:</strong> ${conflict}</div>`
+                ).join('')}
+              </div>
+            ` : ''}
             ${response.classes && response.classes.length > 0 ? `
               <h4>Sample Classes</h4>
               <div class="classes">

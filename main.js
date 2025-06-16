@@ -293,20 +293,48 @@ async function buildHierarchyFromBackend() {
 
 async function buildImportHierarchyFromBackend() {
   try {
-    console.log('Building import hierarchy from backend...');
+    console.log('🔄 DEBUG: Starting buildImportHierarchyFromBackend...');
     
-    // Query the backend for current import hierarchy
-    const response = await invoke('get_import_hierarchy');
-    console.log('Import hierarchy response:', response);
+    // Add loading indicator
+    const importHierarchyTree = document.getElementById('import-hierarchy-tree');
+    importHierarchyTree.innerHTML = '<p>⏳ Loading import hierarchy...</p>';
     
-    if (response.success && response.hierarchy) {
-      console.log('Got import hierarchy from backend:', response.hierarchy.length, 'root nodes');
+    console.log('📡 DEBUG: Calling invoke("get_import_hierarchy")...');
+    const startTime = Date.now();
+    
+    // Add a timeout to the backend call
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Backend timeout after 30 seconds')), 30000);
+    });
+    
+    // Race the actual call against the timeout
+    const response = await Promise.race([
+      invoke('get_import_hierarchy'),
+      timeoutPromise
+    ]);
+    
+    const endTime = Date.now();
+    
+    console.log(`⏱️ DEBUG: Backend response received in ${endTime - startTime}ms`);
+    console.log('📦 DEBUG: Import hierarchy response:', response);
+    console.log('🔍 DEBUG: Response type:', typeof response, 'Keys:', Object.keys(response || {}));
+    
+    if (response && response.success && response.hierarchy) {
+      console.log('✅ DEBUG: Valid response with hierarchy');
+      console.log('📊 DEBUG: Got import hierarchy from backend:', response.hierarchy.length, 'root nodes');
+      console.log('🌳 DEBUG: First few root nodes:', response.hierarchy.slice(0, 3).map(n => ({ uri: n.uri, label: n.label, children: n.children?.length || 0 })));
       
       if (response.hierarchy.length > 0) {
+        console.log('🎨 DEBUG: Assigning colors to graphs...');
         const graphColorMap = assignColorsToGraphs(response.hierarchy);
+        console.log('🎨 DEBUG: Color map created:', Object.keys(graphColorMap));
         
-        const importHierarchyTree = document.getElementById('import-hierarchy-tree');
-        importHierarchyTree.innerHTML = buildTreeHtml(response.hierarchy, graphColorMap, 'ontology');
+        console.log('🏗️ DEBUG: Building tree HTML...');
+        const treeHtml = buildTreeHtml(response.hierarchy, graphColorMap, 'ontology');
+        console.log('🏗️ DEBUG: Tree HTML generated, length:', treeHtml.length, 'chars');
+        
+        console.log('🖼️ DEBUG: Updating DOM...');
+        importHierarchyTree.innerHTML = treeHtml;
         
         document.getElementById('ontology-details').innerHTML = `
           <div class="no-selection">
@@ -315,9 +343,9 @@ async function buildImportHierarchyFromBackend() {
         `;
         
         setHierarchyData(response.hierarchy, 'import');
-        console.log('Import hierarchy tree built successfully');
+        console.log('✅ DEBUG: Import hierarchy tree built successfully!');
       } else {
-        const importHierarchyTree = document.getElementById('import-hierarchy-tree');
+        console.log('⚠️ DEBUG: Empty hierarchy, showing no relationships message');
         importHierarchyTree.innerHTML = '<p>No import relationships found in the loaded ontologies.</p>';
         
         document.getElementById('ontology-details').innerHTML = `
@@ -327,14 +355,32 @@ async function buildImportHierarchyFromBackend() {
         `;
       }
     } else {
-      console.error('Failed to get import hierarchy from backend:', response);
-      const importHierarchyTree = document.getElementById('import-hierarchy-tree');
-      importHierarchyTree.innerHTML = '<p>Error loading import hierarchy</p>';
+      console.error('❌ DEBUG: Invalid response from backend');
+      console.error('📦 DEBUG: Full response object:', response);
+      console.error('🔍 DEBUG: response.success:', response?.success);
+      console.error('🔍 DEBUG: response.hierarchy:', response?.hierarchy);
+      console.error('🔍 DEBUG: response.error:', response?.error);
+      
+      importHierarchyTree.innerHTML = `
+        <div style="color: #dc3545; padding: 10px; background: #f8d7da; border-radius: 4px;">
+          <strong>Failed to load import hierarchy</strong><br>
+          <small>Error: ${response?.error || 'Unknown error'}</small><br>
+          <small>Response: ${JSON.stringify(response, null, 2)}</small>
+        </div>
+      `;
     }
   } catch (error) {
-    console.error('Error building import hierarchy:', error);
+    console.error('💥 DEBUG: Exception in buildImportHierarchyFromBackend:', error);
+    console.error('💥 DEBUG: Error stack:', error.stack);
+    
     const importHierarchyTree = document.getElementById('import-hierarchy-tree');
-    importHierarchyTree.innerHTML = '<p>Error loading import hierarchy</p>';
+    importHierarchyTree.innerHTML = `
+      <div style="color: #dc3545; padding: 10px; background: #f8d7da; border-radius: 4px;">
+        <strong>Exception loading import hierarchy</strong><br>
+        <small>Error: ${error.message}</small><br>
+        <small>Check console for details</small>
+      </div>
+    `;
   }
 }
 

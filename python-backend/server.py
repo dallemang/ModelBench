@@ -276,7 +276,6 @@ def get_current_import_hierarchy():
     import time
     global current_dataset
     
-    print("🔄 DEBUG: /import_hierarchy endpoint called", file=sys.stderr)
     start_time = time.time()
     
     if current_dataset is None:
@@ -284,16 +283,12 @@ def get_current_import_hierarchy():
         raise HTTPException(status_code=400, detail="No dataset currently loaded")
     
     try:
-        print(f"📊 DEBUG: Dataset has {len(list(current_dataset.graphs()))} graphs", file=sys.stderr)
         
         # Build and return the current import hierarchy
-        print("🏗️ DEBUG: Starting build_import_hierarchy_from_dataset...", file=sys.stderr)
         current_import_hierarchy = build_import_hierarchy_from_dataset(current_dataset)
         
         elapsed = time.time() - start_time
-        print(f"✅ DEBUG: Import hierarchy built in {elapsed:.2f}s, {len(current_import_hierarchy)} root nodes", file=sys.stderr)
         
-        print(f"📤 DEBUG: Returning response with {len(current_import_hierarchy)} root nodes", file=sys.stderr)
         return {
             "success": True,
             "hierarchy": current_import_hierarchy

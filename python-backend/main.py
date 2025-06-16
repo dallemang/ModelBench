@@ -293,7 +293,6 @@ def load_imports_recursive(dataset, main_file_path, main_base_uri, loaded_uris=N
             # Check if already loaded
             if import_base_uri in loaded_uris:
                 import_info["status"] = "already_loaded"
-                print(f"  ⚠ Import already loaded: {import_uri}", file=sys.stderr)
                 import_results.append(import_info)
                 continue
             
@@ -307,7 +306,6 @@ def load_imports_recursive(dataset, main_file_path, main_base_uri, loaded_uris=N
             import_info["status"] = "loaded"
             import_info["triples_count"] = len(import_graph)
             
-            print(f"  ✓ Loaded import: {import_uri} ({import_info['triples_count']} triples) from {actual_file_path}", file=sys.stderr)
             
             # Recursively load nested imports
             nested_imports = load_imports_recursive(dataset, actual_file_path, import_base_uri, loaded_uris)

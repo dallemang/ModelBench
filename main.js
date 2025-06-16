@@ -293,13 +293,11 @@ async function buildHierarchyFromBackend() {
 
 async function buildImportHierarchyFromBackend() {
   try {
-    console.log('🔄 DEBUG: Starting buildImportHierarchyFromBackend...');
     
     // Add loading indicator
     const importHierarchyTree = document.getElementById('import-hierarchy-tree');
     importHierarchyTree.innerHTML = '<p>⏳ Loading import hierarchy...</p>';
     
-    console.log('📡 DEBUG: Calling invoke("get_import_hierarchy")...');
     const startTime = Date.now();
     
     // Add a timeout to the backend call
@@ -315,25 +313,14 @@ async function buildImportHierarchyFromBackend() {
     
     const endTime = Date.now();
     
-    console.log(`⏱️ DEBUG: Backend response received in ${endTime - startTime}ms`);
-    console.log('📦 DEBUG: Import hierarchy response:', response);
-    console.log('🔍 DEBUG: Response type:', typeof response, 'Keys:', Object.keys(response || {}));
     
     if (response && response.success && response.hierarchy) {
-      console.log('✅ DEBUG: Valid response with hierarchy');
-      console.log('📊 DEBUG: Got import hierarchy from backend:', response.hierarchy.length, 'root nodes');
-      console.log('🌳 DEBUG: First few root nodes:', response.hierarchy.slice(0, 3).map(n => ({ uri: n.uri, label: n.label, children: n.children?.length || 0 })));
       
       if (response.hierarchy.length > 0) {
-        console.log('🎨 DEBUG: Assigning colors to graphs...');
         const graphColorMap = assignColorsToGraphs(response.hierarchy);
-        console.log('🎨 DEBUG: Color map created:', Object.keys(graphColorMap));
         
-        console.log('🏗️ DEBUG: Building tree HTML...');
         const treeHtml = buildTreeHtml(response.hierarchy, graphColorMap, 'ontology');
-        console.log('🏗️ DEBUG: Tree HTML generated, length:', treeHtml.length, 'chars');
         
-        console.log('🖼️ DEBUG: Updating DOM...');
         importHierarchyTree.innerHTML = treeHtml;
         
         document.getElementById('ontology-details').innerHTML = `
@@ -343,9 +330,7 @@ async function buildImportHierarchyFromBackend() {
         `;
         
         setHierarchyData(response.hierarchy, 'import');
-        console.log('✅ DEBUG: Import hierarchy tree built successfully!');
       } else {
-        console.log('⚠️ DEBUG: Empty hierarchy, showing no relationships message');
         importHierarchyTree.innerHTML = '<p>No import relationships found in the loaded ontologies.</p>';
         
         document.getElementById('ontology-details').innerHTML = `

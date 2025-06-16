@@ -159,7 +159,6 @@ def build_reverse_hierarchy_optimized(dataset, hierarchy, rel):
         List of root entities with populated children
     """
     import sys
-    print(f"🚀 DEBUG: Using optimized reverse hierarchy algorithm", file=sys.stderr)
     
     # Step 1: Find root nodes using SPARQL-style logic
     # Root nodes are subjects of rel that are not objects of rel
@@ -173,7 +172,6 @@ def build_reverse_hierarchy_optimized(dataset, hierarchy, rel):
     
     # Roots are subjects that are not objects
     root_uris = subjects_of_rel - objects_of_rel
-    print(f"📊 DEBUG: Found {len(root_uris)} root nodes", file=sys.stderr)
     
     # Step 2: Build tree with visited tracking
     visited_nodes = set()
@@ -240,32 +238,26 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
         object_on_top: If True, objects of rel are parents (default). If False, subjects are parents.
     """
     import sys
-    print(f"🚀 DEBUG: build_hierarchy called with types={types}, rel={rel}, object_on_top={object_on_top}", file=sys.stderr)
     
     # Collect entities and relationships from all graphs in the dataset
     all_entities = set()
     hierarchy = {}
     
-    print(f"📝 DEBUG: First pass - collecting entities of types {types}", file=sys.stderr)
     
     # First pass: collect all entities of specified types from the federated dataset
     for i, entity_type in enumerate(types):
-        print(f"🔍 DEBUG: Collecting entities of type {entity_type} ({i+1}/{len(types)})", file=sys.stderr)
         dataset_entities = {
             s for s, _, _, _ in dataset.quads((None, RDF.type, entity_type, None))
         }
-        print(f"📊 DEBUG: Found {len(dataset_entities)} entities of type {entity_type}", file=sys.stderr)
 
         all_entities.update({ent for ent in dataset_entities if not isinstance(ent, BNode)})
     
-    print(f"📊 DEBUG: Total entities collected: {len(all_entities)}", file=sys.stderr)
     
-    print(f"🏗️ DEBUG: Building hierarchy entries for {len(all_entities)} entities", file=sys.stderr)
     
     # Build hierarchy entries for all entities
     for i, entity in enumerate(all_entities):
         if i % 50 == 0:  # Progress indicator every 50 entities
-            print(f"🔄 DEBUG: Processing entity {i+1}/{len(all_entities)}", file=sys.stderr)
+            pass
             
         entity_str = str(entity)
         # Find the best label and identify source graph
@@ -302,15 +294,12 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
             "graph_source": graph_source or "unknown"
         }
     
-    print(f"✅ DEBUG: Finished building hierarchy entries", file=sys.stderr)
         
     
-    print(f"🔗 DEBUG: Second pass - collecting relationships using predicate {rel}", file=sys.stderr)
     
     # Check if we should use optimized algorithm for reverse hierarchy
     if not object_on_top:
-        print(f"🚀 DEBUG: Using optimized reverse hierarchy algorithm", file=sys.stderr)
-        return build_reverse_hierarchy_optimized(dataset, hierarchy, rel)
+            return build_reverse_hierarchy_optimized(dataset, hierarchy, rel)
     
     # Traditional algorithm for object_on_top=True
     # Second pass: collect relationships from the entire dataset
@@ -318,7 +307,7 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
     
     for i, entity in enumerate(all_entities):
         if i % 50 == 0:  # Progress indicator every 50 entities
-            print(f"🔗 DEBUG: Processing relationships for entity {i+1}/{len(all_entities)}", file=sys.stderr)
+            pass
             
         entity_str = str(entity)
         
@@ -328,7 +317,7 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
         ]
         
         if related_entities:
-            print(f"🔍 DEBUG: Entity {entity_str[:50]}... has {len(related_entities)} relationships", file=sys.stderr)
+            pass
         
         # Filter out owl:Thing and blank nodes
         meaningful_related = [r for r in related_entities if str(r) != str(OWL.Thing) and not isinstance(r, BNode)]
@@ -382,8 +371,5 @@ def build_class_hierarchy_from_dataset(dataset):
 def build_import_hierarchy_from_dataset(dataset):
     """Build a hierarchical tree structure of ontology imports from all graphs in dataset"""
     import sys
-    print("🔍 DEBUG: build_import_hierarchy_from_dataset called", file=sys.stderr)
-    print(f"📊 DEBUG: Calling build_hierarchy with OWL.Ontology and OWL.imports", file=sys.stderr)
     result = build_hierarchy(dataset, [OWL.Ontology], OWL.imports, object_on_top=False)
-    print(f"✅ DEBUG: build_hierarchy returned {len(result)} root nodes", file=sys.stderr)
     return result

@@ -373,7 +373,7 @@ export function showClassDetails(classInfo) {
           
           return `
             <div class="annotation-group" style="margin-bottom: 15px;">
-              <div class="annotation-property" style="font-weight: bold; margin-bottom: 5px;">${property}:</div>
+              <div class="annotation-property" style="font-weight: bold; margin-bottom: 5px;" title="${annotations[0].property_uri}">${property}:</div>
               <div class="annotation-values" style="margin-left: 20px; padding: 8px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #007bff;">
                 ${valuesHtml}
               </div>
@@ -447,7 +447,7 @@ export function showOntologyDetails(ontologyInfo) {
           
           return `
             <div class="annotation-group" style="margin-bottom: 15px;">
-              <div class="annotation-property" style="font-weight: bold; margin-bottom: 5px;">${property}:</div>
+              <div class="annotation-property" style="font-weight: bold; margin-bottom: 5px;" title="${annotations[0].property_uri}">${property}:</div>
               <div class="annotation-values" style="margin-left: 20px; padding: 8px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #007bff;">
                 ${valuesHtml}
               </div>

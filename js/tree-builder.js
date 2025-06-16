@@ -337,13 +337,61 @@ export function showClassDetails(classInfo) {
   
   const classQname = uriToQname(classInfo.uri);
   
+  // Build annotations HTML
+  let annotationsHtml = '';
+  if (classInfo.annotations && classInfo.annotations.length > 0) {
+    // Group annotations by property
+    const groupedAnnotations = {};
+    classInfo.annotations.forEach(annotation => {
+      if (!groupedAnnotations[annotation.property]) {
+        groupedAnnotations[annotation.property] = [];
+      }
+      groupedAnnotations[annotation.property].push(annotation);
+    });
+    
+    annotationsHtml = `
+      <h3>Annotations</h3>
+      <div class="annotations-section">
+        ${Object.entries(groupedAnnotations)
+          .sort(([propA], [propB]) => {
+            const priorityA = getAnnotationPriority(propA);
+            const priorityB = getAnnotationPriority(propB);
+            if (priorityA !== priorityB) {
+              return priorityA - priorityB;
+            }
+            return propA.toLowerCase().localeCompare(propB.toLowerCase());
+          })
+          .map(([property, annotations]) => {
+          const valuesHtml = annotations.map((annotation, index) => {
+            const value = annotation.is_uri ? 
+              `<a href="${annotation.value}" target="_blank" style="color: #007bff; text-decoration: none;">${annotation.value}</a>` :
+              `<span>${escapeHtml(annotation.value)}</span>`;
+            const separator = annotations.length > 1 && index < annotations.length - 1 ? 
+              `<hr style="margin: 8px 0; border: none; border-top: 1px solid #ddd;">` : '';
+            return `<div style="margin-bottom: 5px;">${value}</div>${separator}`;
+          }).join('');
+          
+          return `
+            <div class="annotation-group" style="margin-bottom: 15px;">
+              <div class="annotation-property" style="font-weight: bold; margin-bottom: 5px;">${property}:</div>
+              <div class="annotation-values" style="margin-left: 20px; padding: 8px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #007bff;">
+                ${valuesHtml}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+  
   detailsContainer.innerHTML = `
     <div class="class-form active">
       <h2 title="${classInfo.uri}">${classInfo.label}</h2>
       <div class="class-info">
-        <p><strong>QName:</strong> <code style="word-break: break-all;" title="${classInfo.uri}">${classQname}</code></p>
+        <p><strong>QName:</strong> <code style="word-break: break-all; font-size: 11px;" title="${classInfo.uri}">${classQname}</code></p>
         <h3>Properties</h3>
         ${propertiesHtml}
+        ${annotationsHtml}
       </div>
     </div>
   `;
@@ -363,22 +411,107 @@ export function showOntologyDetails(ontologyInfo) {
   
   const ontologyQname = uriToQname(ontologyInfo.uri);
   
+  // Build annotations HTML
+  let annotationsHtml = '';
+  if (ontologyInfo.annotations && ontologyInfo.annotations.length > 0) {
+    // Group annotations by property
+    const groupedAnnotations = {};
+    ontologyInfo.annotations.forEach(annotation => {
+      if (!groupedAnnotations[annotation.property]) {
+        groupedAnnotations[annotation.property] = [];
+      }
+      groupedAnnotations[annotation.property].push(annotation);
+    });
+    
+    annotationsHtml = `
+      <h3>Annotations</h3>
+      <div class="annotations-section">
+        ${Object.entries(groupedAnnotations)
+          .sort(([propA], [propB]) => {
+            const priorityA = getAnnotationPriority(propA);
+            const priorityB = getAnnotationPriority(propB);
+            if (priorityA !== priorityB) {
+              return priorityA - priorityB;
+            }
+            return propA.toLowerCase().localeCompare(propB.toLowerCase());
+          })
+          .map(([property, annotations]) => {
+          const valuesHtml = annotations.map((annotation, index) => {
+            const value = annotation.is_uri ? 
+              `<a href="${annotation.value}" target="_blank" style="color: #007bff; text-decoration: none;">${annotation.value}</a>` :
+              `<span>${escapeHtml(annotation.value)}</span>`;
+            const separator = annotations.length > 1 && index < annotations.length - 1 ? 
+              `<hr style="margin: 8px 0; border: none; border-top: 1px solid #ddd;">` : '';
+            return `<div style="margin-bottom: 5px;">${value}</div>${separator}`;
+          }).join('');
+          
+          return `
+            <div class="annotation-group" style="margin-bottom: 15px;">
+              <div class="annotation-property" style="font-weight: bold; margin-bottom: 5px;">${property}:</div>
+              <div class="annotation-values" style="margin-left: 20px; padding: 8px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #007bff;">
+                ${valuesHtml}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+  
   // Show basic ontology information
   detailsContainer.innerHTML = `
     <div class="class-form active">
       <h2 title="${ontologyInfo.uri}">${ontologyInfo.label}</h2>
       <div class="class-info">
-        <p><strong>QName:</strong> <code style="word-break: break-all;" title="${ontologyInfo.uri}">${ontologyQname}</code></p>
-        <p><strong>Graph Source:</strong> <code>${ontologyInfo.graph_source}</code></p>
+        <p><strong>QName:</strong> <code style="word-break: break-all; font-size: 11px;" title="${ontologyInfo.uri}">${ontologyQname}</code></p>
         ${ontologyInfo.children && ontologyInfo.children.length > 0 ? `
           <h3>Imports (${ontologyInfo.children.length})</h3>
           <div class="property-values">
             ${ontologyInfo.children.map(child => `<div>${child.label} (${child.uri})</div>`).join('')}
           </div>
         ` : '<p><em>No imports found</em></p>'}
+        ${annotationsHtml}
       </div>
     </div>
   `;
+}
+
+/**
+ * Get priority for annotation property (lower number = higher priority)
+ * @param {string} property - Property name
+ * @returns {number} Priority number
+ */
+function getAnnotationPriority(property) {
+  const propertyLower = property.toLowerCase();
+  
+  // High priority: labels, titles
+  if (propertyLower.includes('label') || propertyLower.includes('title')) {
+    return 1;
+  }
+  
+  // Medium-high priority: comments, definitions
+  if (propertyLower.includes('comment') || propertyLower.includes('definition') || propertyLower.includes('description')) {
+    return 2;
+  }
+  
+  // Low priority: copyright, license
+  if (propertyLower.includes('copyright') || propertyLower.includes('license') || propertyLower.includes('rights')) {
+    return 9;
+  }
+  
+  // Default medium priority for everything else
+  return 5;
+}
+
+/**
+ * Escape HTML entities in text
+ * @param {string} text - Text to escape
+ * @returns {string} HTML-escaped text
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 /**

@@ -55,6 +55,94 @@ def get_class_properties(graph, class_uri):
     return properties
 
 
+def get_annotations(dataset, resource_uri):
+    """Get all annotation properties for a resource from all graphs in the dataset"""
+    from rdflib import URIRef, Literal
+    import html
+    
+    annotations = []
+    
+    # Ensure resource_uri is a URIRef for RDFLib operations
+    if isinstance(resource_uri, str):
+        resource_uri = URIRef(resource_uri)
+    
+    # Collect ALL properties from all graphs in the dataset - no filtering
+    for s, p, o, _ in dataset.quads((resource_uri, None, None, None)):
+        predicate_uri = str(p)
+        
+        # Only skip the core structural properties that define hierarchy relationships
+        if predicate_uri in [str(RDF.type), str(RDFS.subClassOf), str(OWL.imports), str(RDFS.domain), str(RDFS.range)]:
+            continue
+            
+        # Get predicate label - try to find it in the dataset first
+        predicate_label = get_label_from_dataset(dataset, p)
+        if not predicate_label:
+            # Fall back to local name from the predicate URI
+            if '#' in predicate_uri:
+                predicate_label = predicate_uri.split('#')[-1]
+            elif '/' in predicate_uri:
+                predicate_label = predicate_uri.split('/')[-1]
+            else:
+                predicate_label = predicate_uri
+        
+        # Format the object value
+        if isinstance(o, Literal):
+            value = str(o)
+            # Handle HTML entities like &apos;
+            value = html.unescape(value)
+            
+            # Include datatype if it's not a simple string
+            if o.datatype:
+                datatype_uri = str(o.datatype)
+                if datatype_uri != "http://www.w3.org/2001/XMLSchema#string":
+                    # Get short form of datatype
+                    if '#' in datatype_uri:
+                        datatype = datatype_uri.split('#')[-1]
+                    elif '/' in datatype_uri:
+                        datatype = datatype_uri.split('/')[-1]  
+                    else:
+                        datatype = datatype_uri
+                    value = f"{value} ({datatype})"
+            
+            # Include language tag if present
+            if o.language:
+                value = f"{value} @{o.language}"
+                
+        elif isinstance(o, BNode):
+            continue  # Skip blank nodes for now
+        else:
+            # It's a URI reference
+            value = str(o)
+        
+        annotations.append({
+            "property": predicate_label,
+            "property_uri": predicate_uri,
+            "value": value,
+            "is_uri": not isinstance(o, Literal)
+        })
+    
+    # Sort annotations by property name for consistent display
+    annotations.sort(key=lambda x: x["property"].lower())
+    
+    return annotations
+
+
+def get_label_from_dataset(dataset, resource):
+    """Get label for a resource from any graph in the dataset"""
+    # Try rdfs:label first
+    for _, _, label, _ in dataset.quads((resource, RDFS.label, None, None)):
+        return str(label)
+    
+    # Fall back to local name extraction
+    uri_str = str(resource)
+    if '#' in uri_str:
+        return uri_str.split('#')[-1]
+    elif '/' in uri_str:
+        return uri_str.split('/')[-1]
+    else:
+        return uri_str
+
+
 def build_reverse_hierarchy_optimized(dataset, hierarchy, rel):
     """Optimized algorithm for reverse hierarchy (object_on_top=False)
     
@@ -202,11 +290,15 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
             if OWL.Class in types or RDFS.Class in types:
                 properties.extend(get_class_properties(graph, entity_str))
         
+        # Get annotations for this entity
+        annotations = get_annotations(dataset, entity)
+        
         hierarchy[entity_str] = {
             "uri": entity_str,
             "label": label or entity_str.split('#')[-1].split('/')[-1],
             "children": [],
             "properties": properties,
+            "annotations": annotations,
             "graph_source": graph_source or "unknown"
         }
     
@@ -248,11 +340,14 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
                 parent_str = str(parent)
                 # Create parent entry if it doesn't exist
                 if parent_str not in hierarchy:
+                    from rdflib import URIRef
+                    annotations = get_annotations(dataset, URIRef(parent_str))
                     hierarchy[parent_str] = {
                         "uri": parent_str,
                         "label": parent_str.split('#')[-1].split('/')[-1],
                         "children": [],
                         "properties": [],
+                        "annotations": annotations,
                         "graph_source": "unknown"
                     }
                 if entity_str in hierarchy:

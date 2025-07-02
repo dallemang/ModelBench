@@ -176,6 +176,11 @@ async fn get_import_hierarchy() -> Result<HttpResponse, String> {
     Ok(HttpResponse { data: response })
 }
 
+#[tauri::command]
+async fn get_backend_port() -> Result<u16, String> {
+    get_server_port()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -186,7 +191,8 @@ pub fn run() {
         query_graph, 
         add_triple, 
         get_hierarchy,
-        get_import_hierarchy
+        get_import_hierarchy,
+        get_backend_port
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

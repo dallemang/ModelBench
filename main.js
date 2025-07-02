@@ -37,6 +37,37 @@ function renderImportDetails(imports, level = 0) {
   `).join('');
 }
 
+// Set up API base URL for AI interface  
+window.API_BASE_URL = 'http://127.0.0.1:8731'; // Default fallback
+
+// Function to detect the current Python backend port
+async function detectBackendPort() {
+  try {
+    // Try to get graph info which will trigger the backend to start if needed
+    const result = await invoke('get_graph_info');
+    // If successful, we can try to detect the actual port by checking network requests
+    // For now, we'll use a default approach
+    
+    // Check if we can reach different ports by trying health endpoints
+    const ports = [8731, 62041, 61918]; // Common ports
+    
+    for (const port of ports) {
+      try {
+        const response = await fetch(`http://127.0.0.1:${port}/health`);
+        if (response.ok) {
+          window.API_BASE_URL = `http://127.0.0.1:${port}`;
+          console.log(`Detected backend on port ${port}`);
+          return;
+        }
+      } catch (e) {
+        // Port not available, try next
+      }
+    }
+  } catch (error) {
+    console.warn('Could not detect backend port, using default');
+  }
+}
+
 // Function to handle file loading
 // extra
 async function loadFile() {
@@ -218,8 +249,10 @@ window.getClassData = getClassData;
 window.getNamespaces = getNamespaces;
 
 // Initialize the app
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   console.log('Tauri app initialized');
+  // Detect backend port for AI interface
+  await detectBackendPort();
 });
 
 // Function to build hierarchy and diagram from backend

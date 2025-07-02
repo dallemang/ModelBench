@@ -8,14 +8,15 @@ import json
 import os
 import re
 import uuid
-from typing import Optional
+from typing import Optional, List
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import PlainTextResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from rdflib import Graph, Dataset, URIRef, Literal, BNode
 from rdflib.namespace import RDF, RDFS, OWL
 
-# Import existing functions from main.py
+# Import existing functions and global state from main.py
 from main import (
     scan_for_base_declaration,
     find_base_uri_from_graph,
@@ -26,8 +27,15 @@ from main import (
     load_imports_recursive,
     clear_namespace_registry,
     register_namespaces_from_graph,
-    get_global_namespaces
+    get_global_namespaces,
+    load_rdf_file,
+    get_graph_info,
+    query_graph,
+    build_ontology_context_for_ai
 )
+
+# Import global state from main.py
+import main
 
 # Import hierarchy functions from hierarchy.py
 from hierarchy import (
@@ -37,12 +45,26 @@ from hierarchy import (
     get_class_properties
 )
 
-# Global dataset storage (persistent across requests)
-current_dataset = None
-current_file_path = None
-current_base_uri = None
+# Import AI functionality
+try:
+    from ai_providers import create_provider, ChatMessage, PROVIDERS
+    from ai_config import config_manager
+    AI_AVAILABLE = True
+    print("DEBUG: AI providers imported successfully", file=sys.stderr)
+except ImportError as e:
+    AI_AVAILABLE = False
+    print(f"AI providers not available - missing dependencies: {e}", file=sys.stderr)
 
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:1420", "https://tauri.localhost"],  # Tauri frontend origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Request models
 class LoadRdfRequest(BaseModel):
@@ -56,165 +78,57 @@ class AddTripleRequest(BaseModel):
     predicate: str
     object: str
 
+# AI-related request models
+class ChatRequest(BaseModel):
+    messages: List[dict]
+    provider: Optional[str] = None
+    max_tokens: Optional[int] = 1000
+    temperature: Optional[float] = 0.7
+
+class AIConfigRequest(BaseModel):
+    active_provider: Optional[str] = None
+    providers: Optional[dict] = None
+
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "dataset_loaded": current_dataset is not None}
+    return {"status": "healthy", "dataset_loaded": main.current_dataset is not None}
 
 @app.post("/load_rdf")
 def load_rdf_file_endpoint(request: LoadRdfRequest):
     """Load an RDF file into the dataset"""
-    global current_dataset, current_file_path, current_base_uri
-    
     try:
-        file_path = request.file_path
-        
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=400, detail="File does not exist")
-        
-        # Clear namespace registry for new file load
-        clear_namespace_registry()
-        
-        # Load into dataset with base URI detection
-        dataset, base_uri = load_into_dataset_with_base_detection(file_path)
-        
-        # Store globally for persistence
-        current_dataset = dataset
-        current_file_path = file_path
-        current_base_uri = base_uri
-        
-        # Get the main graph for analysis
-        main_graph = dataset.graph(URIRef(base_uri))
-        
-        # Register namespaces from the main graph
-        register_namespaces_from_graph(main_graph, f"(main file: {file_path})")
-        
-        # Collect basic statistics from the main graph
-        triples_count = len(main_graph)
-        
-        # Count different types of nodes
-        subjects = set(main_graph.subjects())
-        predicates = set(main_graph.predicates())
-        objects = set(main_graph.objects())
-        
-        # Look for ontology classes and properties in all graphs in the dataset
-        classes = set()
-        object_properties = set()
-        datatype_properties = set()
-        
-        # Load imports recursively first so we have the full dataset
-        import_results = load_imports_recursive(dataset, file_path, base_uri)
-        
-        # Now count classes and properties from all graphs in the dataset
-        for graph in dataset.graphs():
-            # Collect classes (owl:Class and rdfs:Class)
-            graph_classes = set(graph.subjects(RDF.type, OWL.Class)) | set(graph.subjects(RDF.type, RDFS.Class))
-            classes.update({cls for cls in graph_classes if not isinstance(cls, BNode)})
-            
-            # Collect object properties
-            graph_obj_props = set(graph.subjects(RDF.type, OWL.ObjectProperty))
-            object_properties.update({prop for prop in graph_obj_props if not isinstance(prop, BNode)})
-            
-            # Collect datatype properties
-            graph_data_props = set(graph.subjects(RDF.type, OWL.DatatypeProperty))
-            datatype_properties.update({prop for prop in graph_data_props if not isinstance(prop, BNode)})
-        
-        # Combine all properties for backward compatibility
-        properties = object_properties | datatype_properties
-        
-        # Count total graphs and triples in dataset
-        total_graphs = len(list(dataset.graphs()))
-        total_triples = sum(len(g) for g in dataset.graphs())
-        
-        # Build class hierarchy from the entire dataset
-        class_hierarchy = build_class_hierarchy_from_dataset(dataset)
-        
-        # Count subclass relationships
-        subclass_count = 0
-        def count_all_relationships(node):
-            count = len(node.get("children", []))
-            for child in node.get("children", []):
-                count += count_all_relationships(child)
-            return count
-        
-        for root in class_hierarchy:
-            subclass_count += count_all_relationships(root)
-        
-        file_stats = os.stat(file_path)
-        
-        return {
-            "success": True,
-            "file_path": file_path,
-            "base_uri": base_uri,
-            "file_size": file_stats.st_size,
-            "triples_count": triples_count,
-            "subjects_count": len(subjects),
-            "predicates_count": len(predicates),
-            "objects_count": len(objects),
-            "namespaces_count": len(get_global_namespaces()[0]),
-            "namespaces": get_global_namespaces()[0],
-            "namespace_conflicts": get_global_namespaces()[1],
-            "classes_count": len(classes),
-            "properties_count": len(properties),
-            "object_properties_count": len(object_properties),
-            "datatype_properties_count": len(datatype_properties),
-            "classes": [str(cls) for cls in list(classes)[:10]],
-            "properties": [str(prop) for prop in list(properties)[:10]],
-            "class_hierarchy": class_hierarchy,
-            "subclass_relationships_count": subclass_count,
-            "imports": import_results,
-            "imports_count": len(import_results),
-            "loaded_graphs": [str(g.identifier) for g in dataset.graphs()],
-            "total_graphs": total_graphs,
-            "total_triples": total_triples
-        }
-        
+        print(f"DEBUG: Loading RDF file: {request.file_path}", file=sys.stderr)
+        result = load_rdf_file(request.file_path)
+        print(f"DEBUG: After loading, main.current_dataset = {main.current_dataset}", file=sys.stderr)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load RDF file: {str(e)}")
 
 @app.get("/graph_info")
-def get_graph_info():
+def get_graph_info_endpoint():
     """Get information about the currently loaded dataset"""
-    global current_dataset, current_file_path, current_base_uri
-    
-    if current_dataset is None:
-        raise HTTPException(status_code=400, detail="No dataset currently loaded")
-    
-    main_graph = current_dataset.graph(URIRef(current_base_uri))
-    
-    return {
-        "loaded": True,
-        "file_path": current_file_path,
-        "base_uri": current_base_uri,
-        "triples_count": len(main_graph),
-        "graphs_count": len(list(current_dataset.graphs()))
-    }
+    result = get_graph_info()
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 @app.post("/query")
-def query_graph(request: QueryRequest):
+def query_graph_endpoint(request: QueryRequest):
     """Execute a SPARQL query on the current dataset"""
-    global current_dataset, current_base_uri
-    
-    if current_dataset is None:
-        raise HTTPException(status_code=400, detail="No dataset currently loaded")
-    
-    try:
-        # Query the main graph by default
-        main_graph = current_dataset.graph(URIRef(current_base_uri))
-        results = main_graph.query(request.sparql_query)
-        return {
-            "success": True,
-            "results": [str(row) for row in results]
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Query failed: {str(e)}")
+    result = query_graph(request.sparql_query)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 @app.post("/add_triple")
 def add_triple(request: AddTripleRequest):
     """Add a triple to the dataset"""
-    global current_dataset
-    
-    if current_dataset is None:
+    if main.current_dataset is None:
         raise HTTPException(status_code=400, detail="No dataset currently loaded")
     
     try:
@@ -222,7 +136,7 @@ def add_triple(request: AddTripleRequest):
         subject_graph_uri = None
         subject_uriref = URIRef(request.subject)
         
-        for graph in current_dataset.graphs():
+        for graph in main.current_dataset.graphs():
             # Look for where the subject is defined (has any rdf:type)
             if (subject_uriref, RDF.type, None) in graph:
                 subject_graph_uri = graph.identifier
@@ -232,7 +146,7 @@ def add_triple(request: AddTripleRequest):
             raise HTTPException(status_code=400, detail=f"Subject {request.subject} not found in any graph")
         
         # Add the triple to the subject's graph
-        subject_graph = current_dataset.graph(subject_graph_uri)
+        subject_graph = main.current_dataset.graph(subject_graph_uri)
         predicate_uriref = URIRef(request.predicate)
         object_uriref = URIRef(request.object)
         
@@ -253,14 +167,12 @@ def add_triple(request: AddTripleRequest):
 @app.get("/hierarchy")
 def get_current_hierarchy():
     """Get the current class hierarchy from the dataset"""
-    global current_dataset
-    
-    if current_dataset is None:
+    if main.current_dataset is None:
         raise HTTPException(status_code=400, detail="No dataset currently loaded")
     
     try:
         # Build and return the current hierarchy
-        current_hierarchy = build_class_hierarchy_from_dataset(current_dataset)
+        current_hierarchy = build_class_hierarchy_from_dataset(main.current_dataset)
         
         return {
             "success": True,
@@ -274,18 +186,17 @@ def get_current_hierarchy():
 def get_current_import_hierarchy():
     """Get the current import hierarchy from the dataset"""
     import time
-    global current_dataset
     
     start_time = time.time()
     
-    if current_dataset is None:
+    if main.current_dataset is None:
         print("❌ DEBUG: No dataset loaded", file=sys.stderr)
         raise HTTPException(status_code=400, detail="No dataset currently loaded")
     
     try:
         
         # Build and return the current import hierarchy
-        current_import_hierarchy = build_import_hierarchy_from_dataset(current_dataset)
+        current_import_hierarchy = build_import_hierarchy_from_dataset(main.current_dataset)
         
         elapsed = time.time() - start_time
         
@@ -325,14 +236,12 @@ def resolve_import_path_endpoint(base_file_path: str, base_uri: str, import_uri:
 @app.get("/dump")
 def dump_dataset():
     """Return the entire dataset as TriG format for browser viewing"""
-    global current_dataset
-    
-    if current_dataset is None:
+    if main.current_dataset is None:
         raise HTTPException(status_code=400, detail="No dataset currently loaded")
     
     try:
         # Serialize the entire dataset to TriG format
-        trig_content = current_dataset.serialize(format='trig')
+        trig_content = main.current_dataset.serialize(format='trig')
         
         # Return as plain text with proper content type
         return PlainTextResponse(
@@ -343,6 +252,191 @@ def dump_dataset():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to dump dataset: {str(e)}")
+
+# AI Endpoints
+
+@app.get("/ai/providers")
+def get_ai_providers():
+    """Get list of available AI providers and their status"""
+    if not AI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI functionality not available")
+    
+    try:
+        config = config_manager.load_config()
+        providers_status = {}
+        
+        for provider_name in PROVIDERS.keys():
+            provider_config = config.providers.get(provider_name, {})
+            print(f"Checking provider {provider_name} with config: {provider_config}", file=sys.stderr)
+            try:
+                provider = create_provider(provider_name, provider_config)
+                is_available = provider.is_available()
+                print(f"Provider {provider_name} availability: {is_available}", file=sys.stderr)
+                providers_status[provider_name] = {
+                    "available": is_available,
+                    "enabled": provider_config.get("enabled", False),
+                    "model": provider_config.get("model", ""),
+                    "models": provider.get_models() if is_available else []
+                }
+                print(f"Provider {provider_name} final status: {providers_status[provider_name]}", file=sys.stderr)
+            except Exception as e:
+                print(f"Error with provider {provider_name}: {e}", file=sys.stderr)
+                providers_status[provider_name] = {
+                    "available": False,
+                    "enabled": False,
+                    "error": str(e),
+                    "models": []
+                }
+        
+        return {
+            "success": True,
+            "active_provider": config.active_provider,
+            "providers": providers_status
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get providers: {str(e)}")
+
+@app.post("/ai/chat")
+def ai_chat(request: ChatRequest):
+    """Send chat message to AI provider"""
+    print("DEBUG: AI chat request received", file=sys.stderr)
+    print(f"DEBUG: AI_AVAILABLE = {AI_AVAILABLE}", file=sys.stderr)
+    if not AI_AVAILABLE:
+        print("DEBUG: AI not available, returning 503", file=sys.stderr)
+        raise HTTPException(status_code=503, detail="AI functionality not available")
+    
+    try:
+        config = config_manager.load_config()
+        provider_name = request.provider or config.active_provider
+        
+        if provider_name not in PROVIDERS:
+            raise HTTPException(status_code=400, detail=f"Unknown provider: {provider_name}")
+        
+        provider_config = config.providers.get(provider_name, {})
+        if not provider_config.get("enabled", False):
+            raise HTTPException(status_code=400, detail=f"Provider {provider_name} is not enabled")
+        
+        # Create provider instance
+        provider = create_provider(provider_name, provider_config)
+        
+        if not provider.is_available():
+            raise HTTPException(status_code=503, detail=f"Provider {provider_name} is not available")
+        
+        # Convert request messages to ChatMessage objects
+        messages = [ChatMessage(role=msg["role"], content=msg["content"]) for msg in request.messages]
+        
+        # Add ontology context if dataset is loaded
+        print(f"DEBUG: Checking if dataset is loaded for AI context", file=sys.stderr)
+        print(f"DEBUG: len(messages) = {len(messages)}", file=sys.stderr)
+        if len(messages) > 0:
+            print("DEBUG: Building ontology context for AI", file=sys.stderr)
+            ontology_ttl = build_ontology_context_for_ai()
+            print(f"DEBUG: Ontology context built, length: {len(ontology_ttl) if ontology_ttl else 0}", file=sys.stderr)
+            if ontology_ttl:
+                # Get the user's prompt (last message should be from user)
+                last_message = messages[-1]
+                if last_message.role == "user":
+                    # Create the combined prompt with ontology context
+                    combined_prompt = f"Here is the currently loaded ontology:\n\n{ontology_ttl}\n\n{last_message.content}"
+                    # Replace the user's message with the combined prompt
+                    messages[-1] = ChatMessage(role="user", content=combined_prompt)
+                    
+                    # Debug: Save the prompt to a file for review
+                    try:
+                        debug_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "debug_prompt.txt"))
+                        print(f"DEBUG: Attempting to write debug file to: {debug_file}", file=sys.stderr)
+                        with open(debug_file, 'w', encoding='utf-8') as f:
+                            f.write("=== FULL PROMPT SENT TO AI ===\n\n")
+                            for i, msg in enumerate(messages):
+                                f.write(f"Message {i+1} ({msg.role}):\n")
+                                f.write(msg.content)
+                                f.write("\n\n" + "="*50 + "\n\n")
+                        print(f"DEBUG: Prompt successfully saved to {debug_file}", file=sys.stderr)
+                    except Exception as e:
+                        print(f"ERROR: Could not save debug prompt: {e}", file=sys.stderr)
+                        print(f"ERROR: Attempted path: {debug_file if 'debug_file' in locals() else 'undefined'}", file=sys.stderr)
+        
+        # Send to AI
+        response = provider.chat(
+            messages,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature
+        )
+        
+        return {
+            "success": True,
+            "provider": provider_name,
+            "content": response
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"AI chat error: {error_details}", file=sys.stderr)
+        raise HTTPException(status_code=500, detail=f"AI chat error: {str(e)}")
+
+@app.get("/ai/config")
+def get_ai_config():
+    """Get current AI configuration"""
+    if not AI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI functionality not available")
+    
+    try:
+        config = config_manager.load_config()
+        
+        # Don't expose API keys in the response
+        safe_config = {
+            "active_provider": config.active_provider,
+            "providers": {}
+        }
+        
+        for provider_name, provider_config in config.providers.items():
+            safe_provider_config = provider_config.copy()
+            # Mask API keys
+            if "api_key" in safe_provider_config:
+                api_key = safe_provider_config["api_key"]
+                if api_key:
+                    safe_provider_config["api_key"] = api_key[:8] + "..." if len(api_key) > 8 else "***"
+                else:
+                    safe_provider_config["api_key"] = ""
+            safe_config["providers"][provider_name] = safe_provider_config
+        
+        return safe_config
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get config: {str(e)}")
+
+@app.post("/ai/config")
+def update_ai_config(request: AIConfigRequest):
+    """Update AI configuration"""
+    if not AI_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AI functionality not available")
+    
+    try:
+        updates = {}
+        
+        if request.active_provider is not None:
+            if request.active_provider not in PROVIDERS:
+                raise HTTPException(status_code=400, detail=f"Unknown provider: {request.active_provider}")
+            updates["active_provider"] = request.active_provider
+        
+        if request.providers is not None:
+            updates["providers"] = request.providers
+        
+        success = config_manager.update_config(updates)
+        
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update configuration")
+        
+        return {"success": True, "message": "Configuration updated"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Configuration update error: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

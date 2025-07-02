@@ -57,6 +57,118 @@ def get_global_namespaces():
     """Get the current global namespace registry"""
     return global_namespaces, namespace_conflicts
 
+def build_ontology_context_for_ai():
+    """Build ontology context from the loaded dataset for AI"""
+    global current_dataset, current_file_path, current_base_uri, global_namespaces
+    
+    if current_dataset is None:
+        return None
+    
+    try:
+        print("DEBUG: Starting ontology context build in main.py", file=sys.stderr)
+        print(f"DEBUG: current_dataset = {current_dataset}", file=sys.stderr)
+        # Serialize the entire dataset to TTL format by merging all graphs
+        merged_graph = Graph()
+        
+        print("DEBUG: Merging graphs", file=sys.stderr)
+        # Add all triples from all graphs in the dataset to the merged graph
+        graph_count = 0
+        triple_count = 0
+        for graph in current_dataset.graphs():
+            graph_count += 1
+            for triple in graph:
+                triple_count += 1
+                merged_graph.add(triple)
+                # Add progress logging for large datasets
+                if triple_count % 10000 == 0:
+                    print(f"DEBUG: Processed {triple_count} triples from {graph_count} graphs", file=sys.stderr)
+        
+        print(f"DEBUG: Merged {triple_count} triples from {graph_count} graphs", file=sys.stderr)
+        
+        # Copy namespaces to the merged graph
+        if global_namespaces:
+            for prefix, namespace in global_namespaces.items():
+                merged_graph.bind(prefix, namespace)
+        
+        # Serialize to TTL format
+        print("DEBUG: Serializing to TTL", file=sys.stderr)
+        ontology_ttl = merged_graph.serialize(format='turtle')
+        
+        # Check if the serialized ontology is too large (> 50KB)
+        if len(ontology_ttl) > 50000:
+            print(f"Warning: Ontology TTL is {len(ontology_ttl)} bytes, falling back to summary", file=sys.stderr)
+            # Fall back to summary statistics instead of full TTL
+            return build_ontology_summary_for_ai()
+        
+        print(f"DEBUG: Ontology TTL built, size: {len(ontology_ttl)} bytes", file=sys.stderr)
+        return ontology_ttl
+        
+    except Exception as e:
+        print(f"ERROR building AI context: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return None
+
+def build_ontology_summary_for_ai():
+    """Build a summary of the ontology for AI when full TTL is too large"""
+    global current_dataset, current_file_path, current_base_uri, global_namespaces
+    
+    if current_dataset is None:
+        return None
+    
+    try:
+        # Get basic stats
+        main_graph = current_dataset.graph(URIRef(current_base_uri))
+        triples_count = len(main_graph)
+        
+        # Count classes and properties across all graphs
+        classes = set()
+        object_properties = set()
+        datatype_properties = set()
+        
+        for graph in current_dataset.graphs():
+            graph_classes = set(graph.subjects(RDF.type, OWL.Class)) | set(graph.subjects(RDF.type, RDFS.Class))
+            classes.update({cls for cls in graph_classes if not isinstance(cls, BNode)})
+            
+            graph_obj_props = set(graph.subjects(RDF.type, OWL.ObjectProperty))
+            object_properties.update({prop for prop in graph_obj_props if not isinstance(prop, BNode)})
+            
+            graph_data_props = set(graph.subjects(RDF.type, OWL.DatatypeProperty))
+            datatype_properties.update({prop for prop in graph_data_props if not isinstance(prop, BNode)})
+        
+        # Build summary
+        summary = f"Ontology Summary:\n"
+        summary += f"File: {current_file_path}\n"
+        summary += f"Base URI: {current_base_uri}\n"
+        summary += f"Classes: {len(classes)}\n"
+        summary += f"Object Properties: {len(object_properties)}\n"
+        summary += f"Datatype Properties: {len(datatype_properties)}\n"
+        summary += f"Total Properties: {len(object_properties) + len(datatype_properties)}\n"
+        summary += f"Triples in main graph: {triples_count}\n"
+        summary += f"Total graphs in dataset: {len(list(current_dataset.graphs()))}\n"
+        
+        if global_namespaces:
+            summary += f"\nNamespaces:\n"
+            for prefix, uri in list(global_namespaces.items())[:10]:  # Limit to first 10
+                summary += f"- {prefix}: {uri}\n"
+        
+        if classes:
+            sample_classes = [str(cls) for cls in list(classes)[:10]]
+            summary += f"\nSample Classes: {', '.join(sample_classes)}\n"
+        
+        if object_properties or datatype_properties:
+            all_props = list(object_properties) + list(datatype_properties)
+            sample_props = [str(prop) for prop in all_props[:10]]
+            summary += f"\nSample Properties: {', '.join(sample_props)}\n"
+        
+        return summary
+        
+    except Exception as e:
+        print(f"ERROR building AI summary: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return None
+
 def scan_for_base_declaration(file_path, max_lines=50):
     """Scan file header for @base or @prefix : declarations"""
     try:
@@ -324,6 +436,8 @@ def load_rdf_file(file_path):
     """Load an RDF file into a dataset and return statistics"""
     global current_dataset, current_file_path, current_base_uri
     
+    print(f"DEBUG: load_rdf_file called with: {file_path}", file=sys.stderr)
+    
     try:
         if not os.path.exists(file_path):
             return {"error": "File does not exist"}
@@ -338,6 +452,10 @@ def load_rdf_file(file_path):
         current_dataset = dataset
         current_file_path = file_path
         current_base_uri = base_uri
+        
+        print(f"DEBUG: Dataset loaded successfully. current_dataset = {current_dataset}", file=sys.stderr)
+        print(f"DEBUG: current_file_path = {current_file_path}", file=sys.stderr)
+        print(f"DEBUG: current_base_uri = {current_base_uri}", file=sys.stderr)
         
         # Get the main graph for analysis (the specific named graph, not the dataset)
         main_graph = dataset.graph(URIRef(base_uri))
@@ -468,26 +586,4 @@ def query_graph(sparql_query):
     except Exception as e:
         return {"error": f"Query failed: {str(e)}"}
 
-def main():
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "No command provided"}))
-        return
-    
-    command = sys.argv[1]
-    
-    if command == "load_rdf" and len(sys.argv) > 2:
-        file_path = sys.argv[2]
-        result = load_rdf_file(file_path)
-        print(json.dumps(result))
-    elif command == "graph_info":
-        result = get_graph_info()
-        print(json.dumps(result))
-    elif command == "query" and len(sys.argv) > 2:
-        query = sys.argv[2]
-        result = query_graph(query)
-        print(json.dumps(result))
-    else:
-        print(json.dumps({"error": "Unknown command or missing parameters"}))
-
-if __name__ == "__main__":
-    main()
+# No command-line interface - this is a library module for server.py

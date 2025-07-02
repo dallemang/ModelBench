@@ -43,6 +43,14 @@ export function switchTab(tabName) {
       }, 300);
     }
   }
+  
+  // If switching to AI tab, initialize AI interface
+  if (tabName === 'ai' && window.initAI && !window.aiInitialized) {
+    setTimeout(() => {
+      window.initAI();
+      window.aiInitialized = true;
+    }, 100);
+  }
 }
 
 /**

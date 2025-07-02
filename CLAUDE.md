@@ -19,6 +19,8 @@ npm run tauri dev          # Start development server with hot reload
 npm run dev               # Start Vite dev server only (port 1420)
 ```
 
+**IMPORTANT**: NEVER manually start the Python backend! Tauri automatically manages it.
+
 ### Building
 ```bash
 npm run tauri build       # Build production executable
@@ -64,6 +66,39 @@ pip install -r python-backend/requirements.txt
 - `python-backend/main.py` provides file processing utilities
 - Can be called with command line arguments for file operations
 - Currently has minimal dependencies (requirements.txt mostly empty)
+
+## CRITICAL ARCHITECTURE RULE - RDF Data Storage
+
+**SINGLE SOURCE OF TRUTH**: All RDF triple data is stored ONLY in `main.current_dataset` global variable in `python-backend/main.py`. 
+
+**ZERO EXCEPTIONS**: 
+- NO triples are ever cached anywhere else in the system
+- ALL data access MUST go through `server.py` endpoints that reference `main.current_dataset`
+- To check if dataset is loaded, MUST call a function from `main.py` or use existing API endpoints
+- NEVER directly access `main.current_dataset` from `server.py` - always call functions from `main.py`
+
+**Data Flow**: Frontend → server.py endpoints → main.py functions → main.current_dataset
+
+This architecture ensures data consistency and single source of truth for all RDF operations.
+
+## Python Backend Management
+
+**CRITICAL**: The Python backend is automatically managed by Tauri. DO NOT start it manually!
+
+**How it works**:
+- Tauri auto-starts Python backend on a random available port when needed
+- Tauri manages the process lifecycle (starts, restarts if crashed, stops on exit)
+- All operations (file loading, AI, queries) use the same auto-managed backend instance
+- Frontend automatically detects the current backend port for AI operations
+
+**What NOT to do**:
+- ❌ `python server.py 8731` (manual start)
+- ❌ Running multiple Python backends simultaneously
+
+**What TO do**:
+- ✅ `npm run tauri dev` (starts everything including auto-managed Python backend)
+- ✅ Load files through UI (data goes to auto-managed backend)
+- ✅ Use AI features (connects to same backend with loaded data)
 
 ## File Structure
 - `main.js` - Frontend logic and Tauri API integration

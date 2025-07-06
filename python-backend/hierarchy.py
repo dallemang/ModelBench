@@ -3,9 +3,18 @@
 Hierarchy building module for OntoBench - builds hierarchical tree structures from RDF data
 """
 
-from rdflib import BNode
+from rdflib import BNode, Literal
 from rdflib.namespace import RDF, RDFS, OWL
 
+
+def is_deprecated(dataset, resource):
+    """Check if a resource is marked as deprecated (owl:deprecated "true")"""
+    for graph in dataset.graphs():
+        deprecated_values = list(graph.objects(resource, OWL.deprecated))
+        for value in deprecated_values:
+            if isinstance(value, Literal) and str(value).lower() == "true":
+                return True
+    return False
 
 def get_label(graph, resource):
     """Get the label for a resource, falling back to local name"""
@@ -250,7 +259,11 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
             s for s, _, _, _ in dataset.quads((None, RDF.type, entity_type, None))
         }
 
-        all_entities.update({ent for ent in dataset_entities if not isinstance(ent, BNode)})
+        # Filter out blank nodes and deprecated entities
+        non_blank_entities = {ent for ent in dataset_entities if not isinstance(ent, BNode)}
+        non_deprecated_entities = {ent for ent in non_blank_entities if not is_deprecated(dataset, ent)}
+        
+        all_entities.update(non_deprecated_entities)
     
     
     

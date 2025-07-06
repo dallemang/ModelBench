@@ -436,13 +436,40 @@ function buildOntologyContext() {
 }
 
 // Show AI message in chat
+// Format code blocks in AI responses
+function formatCodeBlocks(content) {
+    // Replace ```language\ncode\n``` blocks with formatted HTML
+    return content.replace(/```(\w+)?\n([\s\S]*?)\n?```/g, (match, language, code) => {
+        const lang = language || 'text';
+        const formattedCode = code
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        
+        return `<div class="code-block">
+            <div class="code-header">${lang.toUpperCase()}</div>
+            <pre><code class="language-${lang}">${formattedCode}</code></pre>
+        </div>`;
+    });
+}
+
 function showAIMessage(role, content) {
     const messagesContainer = document.getElementById('ai-chat-messages');
     if (!messagesContainer) return;
     
     const messageDiv = document.createElement('div');
     messageDiv.className = `ai-message ${role}`;
-    messageDiv.textContent = content;
+    
+    if (role === 'assistant') {
+        // Format code blocks for assistant responses
+        const formattedContent = formatCodeBlocks(content);
+        messageDiv.innerHTML = formattedContent;
+    } else {
+        // Plain text for user and system messages
+        messageDiv.textContent = content;
+    }
     
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;

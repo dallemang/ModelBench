@@ -4,7 +4,8 @@
       "Bash(npm create:*)",
       "Bash(mkdir:*)",
       "Bash(rg:*)",
-      "Bash(npm run tauri:*)"
+      "Bash(npm run tauri:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   },

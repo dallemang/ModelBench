@@ -100,6 +100,23 @@ This architecture ensures data consistency and single source of truth for all RD
 - ✅ Load files through UI (data goes to auto-managed backend)
 - ✅ Use AI features (connects to same backend with loaded data)
 
+## Planned AI Features
+
+### AI-Assisted Relationship Naming
+**Goal**: When users create connections between classes in the ontology editor, AI suggests meaningful relationship names and allows discussion about naming.
+
+**Workflow**:
+1. User connects Class A → Class B in editor
+2. System calls AI with context: source class, target class, current ontology
+3. AI suggests relationship name(s) based on semantic meaning
+4. User can accept suggestion or discuss alternatives with AI
+5. Final relationship name is applied to the connection
+
+**Implementation notes**: 
+- Will integrate with existing ontology editing workflow (separate from current AI chat tab)
+- Should use same AI infrastructure (providers, context building) but different UI integration point
+- AI context should include both classes' definitions, properties, and relationships for informed suggestions
+
 ## File Structure
 - `main.js` - Frontend logic and Tauri API integration
 - `src-tauri/` - Rust application code and Tauri configuration

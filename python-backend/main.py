@@ -569,19 +569,52 @@ def get_graph_info():
     }
 
 def query_graph(sparql_query):
-    """Execute a SPARQL query on the current dataset"""
+    """Execute a SPARQL query on the current dataset (merged graphs)"""
     global current_dataset, current_base_uri
     
     if current_dataset is None:
         return {"error": "No dataset currently loaded"}
     
     try:
-        # Query the main graph by default
-        main_graph = current_dataset.graph(URIRef(current_base_uri))
-        results = main_graph.query(sparql_query)
+        # Create merged graph from all graphs in dataset
+        from rdflib import Graph
+        merged_graph = Graph()
+        
+        # Add all triples from all graphs to merged graph
+        for graph in current_dataset.graphs():
+            for triple in graph:
+                merged_graph.add(triple)
+        
+        # Copy namespaces to merged graph
+        if hasattr(current_dataset, 'namespaces'):
+            for prefix, namespace in current_dataset.namespaces():
+                merged_graph.bind(prefix, namespace)
+        
+        # Execute query on merged graph
+        results = merged_graph.query(sparql_query)
+        
+        # Convert results to structured format
+        result_list = []
+        variables = []
+        
+        if hasattr(results, 'vars') and results.vars:
+            # SELECT query with variables
+            variables = [str(var) for var in results.vars]
+            for row in results:
+                row_dict = {}
+                for i, var in enumerate(variables):
+                    value = row[i] if i < len(row) else None
+                    row_dict[var] = str(value) if value is not None else None
+                result_list.append(row_dict)
+        else:
+            # ASK query or no variables
+            result_list = [str(row) for row in results]
+        
         return {
             "success": True,
-            "results": [str(row) for row in results]
+            "results": result_list,
+            "variables": variables,
+            "count": len(result_list)
         }
     except Exception as e:
         return {"error": f"Query failed: {str(e)}"}

@@ -403,6 +403,51 @@
         border-radius: 0;
         font-family: inherit;
       }
+      
+      /* Query results table styling */
+      .query-results-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        font-size: 14px;
+      }
+      .query-results-table th {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        padding: 8px 12px;
+        font-weight: 600;
+        text-align: left;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+      }
+      .query-results-table td {
+        border: 1px solid #dee2e6;
+        padding: 6px 12px;
+        vertical-align: top;
+        word-break: break-all;
+      }
+      .query-results-table tr:nth-child(even) {
+        background: #f8f9fa;
+      }
+      .query-results-table tr:hover {
+        background: #e9ecef;
+      }
+      .query-status-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+      }
+      .query-status-error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+      }
+      .query-status-info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+      }
     </style>
   </head>
 
@@ -422,6 +467,7 @@
           <button class="tab-button active" onclick="switchTab('hierarchy')">Class Hierarchy</button>
           <button class="tab-button" onclick="switchTab('import-hierarchy')">Import Hierarchy</button>
           <button class="tab-button" onclick="switchTab('diagram')">Class Diagram</button>
+          <button class="tab-button" onclick="switchTab('query')">SPARQL Query</button>
           <button class="tab-button" onclick="switchTab('ai')">AI Assistant</button>
           <button class="tab-button" onclick="switchTab('log')">Log</button>
         </div>
@@ -472,6 +518,36 @@
                 <button onclick="debugDiagramData()">Debug Data</button>
               </div>
               <div id="cytoscape-container"></div>
+            </div>
+          </div>
+          
+          <!-- SPARQL Query Tab -->
+          <div id="tab-query" class="tab-pane">
+            <div class="split-panel">
+              <div class="left-panel">
+                <h3>SPARQL Query</h3>
+                <div style="margin-bottom: 10px;">
+                  <button id="run-query-btn" onclick="runSparqlQuery()" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">▶ Run Query</button>
+                  <button onclick="clearQuery()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 8px;">Clear</button>
+                </div>
+                <textarea id="sparql-query-input" placeholder="Enter your SPARQL query here...
+
+Example:
+SELECT ?class ?label WHERE {
+  ?class rdf:type owl:Class .
+  OPTIONAL { ?class rdfs:label ?label }
+}
+LIMIT 10" style="width: 100%; height: 400px; font-family: 'Courier New', monospace; font-size: 14px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; resize: vertical;"></textarea>
+              </div>
+              <div class="right-panel">
+                <h3>Query Results</h3>
+                <div id="query-status" style="margin-bottom: 10px; padding: 8px; border-radius: 4px; display: none;"></div>
+                <div id="query-results" style="height: 450px; overflow: auto; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
+                  <div style="padding: 20px; text-align: center; color: #666; font-style: italic;">
+                    No query results yet. Enter a SPARQL query and click "Run Query" to see results.
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           
@@ -531,5 +607,6 @@
 
     <script type="module" src="/main.js"></script>
     <script type="module" src="/js/ai-interface.js"></script>
+    <script type="module" src="/js/sparql-query.js"></script>
   </body>
 </html>

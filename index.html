@@ -475,6 +475,15 @@
         color: #0c5460;
         border: 1px solid #bee5eb;
       }
+      
+      /* Fix any potential button issues */
+      #run-query-btn, #fix-query-btn {
+        z-index: 10;
+        position: relative;
+      }
+      #run-query-btn:disabled, #fix-query-btn:disabled {
+        pointer-events: none;
+      }
     </style>
   </head>
 
@@ -555,6 +564,7 @@
                 <h3>SPARQL Query</h3>
                 <div style="margin-bottom: 10px;">
                   <button id="run-query-btn" onclick="runSparqlQuery()" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">▶ Run Query</button>
+                  <button id="fix-query-btn" onclick="fixSparqlQuery()" disabled style="padding: 8px 16px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 8px; opacity: 0.5;">🤖 Fix Query</button>
                   <button onclick="clearQuery()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 8px;">Clear</button>
                 </div>
                 <textarea id="sparql-query-input" placeholder="Enter your SPARQL query here...

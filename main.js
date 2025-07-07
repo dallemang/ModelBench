@@ -37,8 +37,8 @@ function renderImportDetails(imports, level = 0) {
   `).join('');
 }
 
-// Set up API base URL for AI interface  
-window.API_BASE_URL = 'http://127.0.0.1:8731'; // Default fallback
+// API base URL will be set by AI interface initialization
+// DO NOT set a hardcoded value here as it overrides port detection
 
 // Function to detect the current Python backend port
 async function detectBackendPort() {
@@ -405,6 +405,18 @@ async function buildImportHierarchyFromBackend() {
 // Make the functions globally available
 window.buildHierarchyFromBackend = buildHierarchyFromBackend;
 window.buildImportHierarchyFromBackend = buildImportHierarchyFromBackend;
+
+// Initialize AI interface on page load
+document.addEventListener('DOMContentLoaded', async () => {
+  if (window.initAI) {
+    try {
+      await window.initAI();
+      console.log('AI interface initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize AI interface:', error);
+    }
+  }
+});
 
 // Enable hot module replacement for development
 if (import.meta.hot) {

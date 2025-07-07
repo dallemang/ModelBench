@@ -36,19 +36,43 @@ async function runSparqlQuery() {
         // Tauri wraps the response in a 'data' property
         const data = response.data || response;
         
-        if (data.error) {
-            showQueryStatus(`Query Error: ${data.error}`, 'error');
-            resultsDiv.innerHTML = '<div style="padding: 20px; color: #dc3545;">Query failed. See error message above.</div>';
-        } else {
+        console.log('Query response:', response); // Debug logging
+        
+        if (data && data.error) {
+            showQueryStatus(`${data.error}`, 'error');
+            resultsDiv.innerHTML = `<div style="padding: 20px; color: #dc3545; font-family: monospace; white-space: pre-wrap; line-height: 1.4;">${escapeHtml(data.error)}</div>`;
+        } else if (data && data.success) {
             // Display results
             displayQueryResults(data, resultsDiv);
             showQueryStatus(`Query completed successfully. ${data.count || data.results?.length || 0} results.`, 'success');
+        } else {
+            // Unexpected response format
+            showQueryStatus(`Unexpected response format`, 'error');
+            resultsDiv.innerHTML = `<div style="padding: 20px; color: #dc3545;">Unexpected response format. Check console for details.</div>`;
         }
         
     } catch (error) {
         console.error('SPARQL query failed:', error);
-        showQueryStatus(`Error: ${error.message}`, 'error');
-        resultsDiv.innerHTML = '<div style="padding: 20px; color: #dc3545;">Query execution failed.</div>';
+        
+        // Extract detailed error message from HTTP error
+        let errorMessage = error?.message || String(error) || 'Unknown error';
+        
+        // Check if it's an HTTP error with JSON detail
+        if (errorMessage && errorMessage.includes && errorMessage.includes('HTTP error') && errorMessage.includes('{"detail":')) {
+            try {
+                // Extract the JSON part from the error message
+                const jsonStart = errorMessage.indexOf('{"detail":');
+                const jsonStr = errorMessage.substring(jsonStart);
+                const errorData = JSON.parse(jsonStr);
+                errorMessage = errorData.detail || errorMessage;
+            } catch (parseError) {
+                // If JSON parsing fails, use the original message
+                console.warn('Could not parse error JSON:', parseError);
+            }
+        }
+        
+        showQueryStatus(errorMessage, 'error');
+        resultsDiv.innerHTML = `<div style="padding: 20px; color: #dc3545; font-family: monospace; white-space: pre-wrap; line-height: 1.4;">${escapeHtml(errorMessage)}</div>`;
     } finally {
         // Re-enable run button
         runButton.disabled = false;

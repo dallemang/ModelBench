@@ -617,6 +617,15 @@ def query_graph(sparql_query):
             "count": len(result_list)
         }
     except Exception as e:
-        return {"error": f"Query failed: {str(e)}"}
+        # Provide more detailed error reporting for SPARQL syntax errors
+        error_msg = str(e)
+        
+        # Check if it's a SPARQL syntax error and provide more context
+        if "ParseException" in error_msg or "syntax error" in error_msg.lower():
+            return {"error": f"SPARQL Syntax Error: {error_msg}"}
+        elif "rdflib.plugins.sparql" in error_msg:
+            return {"error": f"SPARQL Error: {error_msg}"}
+        else:
+            return {"error": f"Query execution failed: {error_msg}"}
 
 # No command-line interface - this is a library module for server.py

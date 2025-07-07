@@ -407,9 +407,11 @@
       /* Query results table styling */
       .query-results-table {
         width: 100%;
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         background: white;
         font-size: 14px;
+        table-layout: fixed;
       }
       .query-results-table th {
         background: #f8f9fa;
@@ -420,6 +422,31 @@
         position: sticky;
         top: 0;
         z-index: 1;
+        position: relative;
+        min-width: 80px;
+        max-width: 500px;
+      }
+      .query-results-table th:not(:last-child) {
+        border-right: none;
+      }
+      .column-resizer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 6px;
+        cursor: col-resize;
+        background: transparent;
+        border-right: 2px solid #dee2e6;
+        z-index: 2;
+      }
+      .column-resizer:hover {
+        background: rgba(0, 123, 255, 0.1);
+        border-right-color: #007bff;
+      }
+      .column-resizer.resizing {
+        background: rgba(0, 123, 255, 0.2);
+        border-right-color: #007bff;
       }
       .query-results-table td {
         border: 1px solid #dee2e6;

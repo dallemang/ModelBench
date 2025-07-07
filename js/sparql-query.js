@@ -5,14 +5,10 @@
 
 // Run SPARQL query
 async function runSparqlQuery() {
-    console.log('runSparqlQuery called'); // Debug logging
-    
     const queryInput = document.getElementById('sparql-query-input');
     const resultsDiv = document.getElementById('query-results');
     const statusDiv = document.getElementById('query-status');
     const runButton = document.getElementById('run-query-btn');
-    
-    console.log('Elements found:', {queryInput, resultsDiv, statusDiv, runButton}); // Debug logging
     
     if (!queryInput || !resultsDiv || !statusDiv) {
         console.error('Query UI elements not found');
@@ -39,8 +35,6 @@ async function runSparqlQuery() {
         
         // Tauri wraps the response in a 'data' property
         const data = response.data || response;
-        
-        console.log('Query response:', response); // Debug logging
         
         if (data && data.error) {
             showQueryStatus(`${data.error}`, 'error');
@@ -340,8 +334,6 @@ async function fixSparqlQuery() {
             }
         }
         const apiBaseUrl = window.API_BASE_URL;
-        
-        console.log('Using AI API base URL:', apiBaseUrl);
         
         // Create AI prompt
         const prompt = `The user tried to write a SPARQL query of this form: ${lastFailedQuery}. This resulted in an error message from the query processor: ${lastErrorMessage}. Please re-write the query to correct for this error. Enclose your new query inside of triple ticks.`;

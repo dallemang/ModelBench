@@ -77,41 +77,29 @@ fn start_python_server() -> Result<u16, String> {
     // Wait longer for server to start (uvicorn needs time to initialize)
     std::thread::sleep(std::time::Duration::from_millis(2000));
     
-    println!("Python backend started on port {}", port);
     Ok(port)
 }
 
 fn get_server_port() -> Result<u16, String> {
-    println!("get_server_port() called");
-    
     // First check if we have a cached port that's working (fast path)
     {
         let last_port_guard = LAST_KNOWN_PORT.lock().unwrap();
         if let Some(port) = *last_port_guard {
-            println!("Checking cached port: {}", port);
             // Test if the port is still responding before using it
             if test_port_health(port) {
-                println!("Cached port {} is healthy, reusing", port);
                 return Ok(port);
-            } else {
-                println!("Cached port {} is not responding", port);
             }
-        } else {
-            println!("No cached port found");
         }
     }
     
     // Use a global lock to prevent concurrent server creation
     let _creation_lock = SERVER_CREATION_LOCK.lock().unwrap();
-    println!("Acquired server creation lock");
     
     // Check again after acquiring the lock in case another thread created the server
     {
         let last_port_guard = LAST_KNOWN_PORT.lock().unwrap();
         if let Some(port) = *last_port_guard {
-            println!("Rechecking cached port after lock: {}", port);
             if test_port_health(port) {
-                println!("Cached port {} is healthy after lock, reusing", port);
                 return Ok(port);
             }
         }
@@ -121,12 +109,10 @@ fn get_server_port() -> Result<u16, String> {
     
     match server_guard.as_mut() {
         Some((child, port)) => {
-            println!("Found existing server process on port {}", port);
             // Check if process is still running - be more conservative
             match child.try_wait() {
-                Ok(Some(exit_status)) => {
+                Ok(Some(_exit_status)) => {
                     // Process has definitely exited
-                    println!("Python server process exited with status: {:?}", exit_status);
                     *server_guard = None;
                     // Clear cached port
                     let mut last_port_guard = LAST_KNOWN_PORT.lock().unwrap();
@@ -137,16 +123,13 @@ fn get_server_port() -> Result<u16, String> {
                 },
                 Ok(None) => {
                     // Process is still running, test if port is responding
-                    println!("Process is still running, testing port health for {}", port);
                     if test_port_health(*port) {
-                        println!("Port {} is healthy, reusing existing server", port);
                         // Update cached port
                         let mut last_port_guard = LAST_KNOWN_PORT.lock().unwrap();
                         *last_port_guard = Some(*port);
                         Ok(*port)
                     } else {
                         // Port not responding, restart
-                        println!("Python server port {} not responding, restarting", port);
                         *server_guard = None;
                         // Clear cached port
                         let mut last_port_guard = LAST_KNOWN_PORT.lock().unwrap();
@@ -156,9 +139,8 @@ fn get_server_port() -> Result<u16, String> {
                         start_python_server()
                     }
                 },
-                Err(e) => {
+                Err(_e) => {
                     // Error checking process status - be conservative and keep using it
-                    println!("Warning: Error checking Python server process: {}", e);
                     // If we can't check the process, test the port instead
                     if test_port_health(*port) {
                         let mut last_port_guard = LAST_KNOWN_PORT.lock().unwrap();
@@ -178,7 +160,6 @@ fn get_server_port() -> Result<u16, String> {
         },
         None => {
             // No server running, start one
-            println!("No server found in PYTHON_SERVER, starting new one");
             // Clear cached port
             let mut last_port_guard = LAST_KNOWN_PORT.lock().unwrap();
             *last_port_guard = None;
@@ -200,11 +181,9 @@ fn test_port_health(port: u16) -> bool {
         
         match TcpStream::connect_timeout(&addr, timeout) {
             Ok(_) => {
-                println!("Port {} health check passed on attempt {}", port, attempt);
                 return true;
             },
-            Err(e) => {
-                println!("Port {} health check attempt {} failed: {}", port, attempt, e);
+            Err(_) => {
                 if attempt < 3 {
                     std::thread::sleep(Duration::from_millis(300)); // Wait between attempts
                 }
@@ -212,15 +191,12 @@ fn test_port_health(port: u16) -> bool {
         }
     }
     
-    println!("Port {} failed all health check attempts", port);
     false
 }
 
 async fn make_http_request(method: &str, endpoint: &str, body: Option<Value>) -> Result<Value, String> {
     let port = get_server_port()?;
     let url = format!("http://127.0.0.1:{}{}", port, endpoint);
-    
-    println!("Making HTTP request to: {}", url);
     
     let client = reqwest::Client::new();
     

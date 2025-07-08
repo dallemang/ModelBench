@@ -268,6 +268,8 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
     
     
     # Build hierarchy entries for all entities
+    print(f"DEBUG: Found {len(all_entities)} total entities (classes) in the dataset", file=sys.stderr)
+    
     for i, entity in enumerate(all_entities):
         if i % 50 == 0:  # Progress indicator every 50 entities
             pass
@@ -304,7 +306,8 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
             "children": [],
             "properties": properties,
             "annotations": annotations,
-            "graph_source": graph_source or "unknown"
+            "graph_source": graph_source or "unknown",
+            "is_inferred": False
         }
     
         
@@ -317,6 +320,9 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
     # Traditional algorithm for object_on_top=True
     # Second pass: collect relationships from the entire dataset
     roots = set(all_entities)  # Start with all entities as potential roots
+    
+    print(f"DEBUG: Created {len(hierarchy)} hierarchy entries", file=sys.stderr)
+    print(f"DEBUG: Starting with {len(roots)} potential root entities", file=sys.stderr)
     
     for i, entity in enumerate(all_entities):
         if i % 50 == 0:  # Progress indicator every 50 entities
@@ -343,15 +349,42 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
                 # Create parent entry if it doesn't exist
                 if parent_str not in hierarchy:
                     from rdflib import URIRef
-                    annotations = get_annotations(dataset, URIRef(parent_str))
-                    hierarchy[parent_str] = {
-                        "uri": parent_str,
-                        "label": parent_str.split('#')[-1].split('/')[-1],
-                        "children": [],
-                        "properties": [],
-                        "annotations": annotations,
-                        "graph_source": "unknown"
-                    }
+                    # Check if this is an external/inferred class (not in our original entities)
+                    is_inferred = str(parent) not in [str(e) for e in all_entities]
+                    
+                    if is_inferred:
+                        # External class - minimal info, use CURIE as label
+                        curie_label = parent_str
+                        if '#' in parent_str:
+                            curie_label = parent_str.split('#')[-1]
+                        elif '/' in parent_str:
+                            curie_label = parent_str.split('/')[-1]
+                        
+                        hierarchy[parent_str] = {
+                            "uri": parent_str,
+                            "label": curie_label,
+                            "children": [],
+                            "properties": [],
+                            "annotations": [],
+                            "graph_source": "inferred",
+                            "is_inferred": True
+                        }
+                        
+                        # Add external classes to roots since they have no parents in our dataset
+                        roots.add(parent)
+                        print(f"DEBUG: Added external class as root: {curie_label} ({parent_str})", file=sys.stderr)
+                    else:
+                        # Internal class that somehow wasn't processed yet
+                        annotations = get_annotations(dataset, URIRef(parent_str))
+                        hierarchy[parent_str] = {
+                            "uri": parent_str,
+                            "label": parent_str.split('#')[-1].split('/')[-1],
+                            "children": [],
+                            "properties": [],
+                            "annotations": annotations,
+                            "graph_source": "unknown",
+                            "is_inferred": False
+                        }
                 if entity_str in hierarchy:
                     # Avoid duplicates using URI comparison (much faster than object comparison)
                     existing_child_uris = {child["uri"] for child in hierarchy[parent_str]["children"]}
@@ -366,12 +399,28 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
                 sort_hierarchy(child)
     
     # Get root entities and sort them
+    print(f"DEBUG: After relationship processing, {len(roots)} entities remain as roots", file=sys.stderr)
+    
     root_entities = [hierarchy[str(root)] for root in roots if str(root) in hierarchy]
     root_entities.sort(key=lambda x: x["label"].lower())
+    
+    print(f"DEBUG: Final hierarchy has {len(root_entities)} root entities", file=sys.stderr)
     
     # Sort all children recursively
     for root in root_entities:
         sort_hierarchy(root)
+    
+    # Count total classes in the final hierarchy for debugging
+    def count_total_in_hierarchy(nodes):
+        count = 0
+        for node in nodes:
+            count += 1
+            if node["children"]:
+                count += count_total_in_hierarchy(node["children"])
+        return count
+    
+    total_in_hierarchy = count_total_in_hierarchy(root_entities)
+    print(f"DEBUG: Total classes in final hierarchy: {total_in_hierarchy}", file=sys.stderr)
     
     return root_entities
 

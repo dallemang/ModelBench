@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { createClassDiagram, resetViewportState } from './js/cytoscape-renderer.js';
 import { switchTab, resetLayout, fitToScreen, debugDiagramData, toggleLayoutType, setHierarchyData, getCurrentLayoutType } from './js/ui-controls.js';
-import { buildTreeHtml, selectClass, selectOntology, toggleNode, setTreeState, getClassData, getNamespaces } from './js/tree-builder.js';
+import { buildTreeHtml, selectClass, selectOntology, toggleNode, setTreeState, getClassData, getNamespaces, countClasses } from './js/tree-builder.js';
 import { assignColorsToGraphs } from './js/color-utils.js';
 
 // Helper function to render import details recursively
@@ -270,6 +270,13 @@ async function buildHierarchyFromBackend() {
         const graphColorMap = assignColorsToGraphs(response.hierarchy);
         
         window.currentGraphColorMap = graphColorMap;
+        
+        // Count total classes and update the title
+        const totalClasses = countClasses(response.hierarchy);
+        const hierarchyTitle = document.querySelector('#tab-hierarchy h3');
+        if (hierarchyTitle) {
+          hierarchyTitle.textContent = `Class Hierarchy (${totalClasses} classes)`;
+        }
         
         const hierarchyTree = document.getElementById('hierarchy-tree');
         hierarchyTree.innerHTML = buildTreeHtml(response.hierarchy, graphColorMap);

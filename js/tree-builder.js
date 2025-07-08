@@ -38,6 +38,24 @@ export function getNamespaces() {
 }
 
 /**
+ * Count total number of classes in hierarchy tree (recursive)
+ * @param {Array} nodes - Array of hierarchy nodes
+ * @returns {number} Total class count
+ */
+export function countClasses(nodes) {
+  if (!nodes || nodes.length === 0) return 0;
+  
+  let count = 0;
+  for (const node of nodes) {
+    count += 1; // Count this node
+    if (node.children && node.children.length > 0) {
+      count += countClasses(node.children); // Count children recursively
+    }
+  }
+  return count;
+}
+
+/**
  * Build tree HTML from hierarchy data
  * @param {Array} nodes - Array of hierarchy nodes
  * @param {Object} graphColorMap - Required pre-calculated color mapping
@@ -87,10 +105,14 @@ export function buildTreeHtml(nodes, graphColorMap, selectionType = 'class', roo
     // Determine which selection function to use
     const clickFunction = selectionType === 'ontology' ? 'selectOntology' : 'selectClass';
     
+    // Apply special styling for inferred (external) classes
+    const inferredStyle = node.is_inferred ? 'font-style: italic; opacity: 0.7;' : '';
+    const inferredTitle = node.is_inferred ? `${node.uri} (external/inferred class)` : node.uri;
+    
     return `
       <div class="tree-node">
         <span class="tree-toggle" onclick="toggleNode(this)">${toggleSymbol}</span>
-        <span class="tree-label" title="${node.uri}" onclick="${clickFunction}('${node.uri}')" style="color: ${textColor}; font-weight: bold;">${node.label}</span>
+        <span class="tree-label" title="${inferredTitle}" onclick="${clickFunction}('${node.uri}')" style="color: ${textColor}; font-weight: bold; ${inferredStyle}">${node.label}</span>
         ${hasChildren ? `<div class="tree-children collapsed">${childrenHtml}</div>` : ''}
       </div>
     `;

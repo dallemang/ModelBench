@@ -233,8 +233,60 @@ async function loadFile() {
   }
 }
 
+// Function to close/clear the dataset
+async function closeDataset() {
+  try {
+    // Call the backend to clear the dataset
+    const response = await invoke('clear_dataset');
+    
+    console.log('Clear dataset response:', response);
+    
+    if (response.success) {
+      // Clear the UI state
+      resetViewportState();
+      
+      // Hide tab container
+      document.getElementById('tab-container').style.display = 'none';
+      
+      // Clear all tab content
+      document.getElementById('hierarchy-tree').innerHTML = '';
+      document.getElementById('import-hierarchy-tree').innerHTML = '';
+      document.getElementById('class-details').innerHTML = `
+        <div class="no-selection">
+          <p>Select a class from the hierarchy to view its details</p>
+        </div>
+      `;
+      document.getElementById('ontology-details').innerHTML = `
+        <div class="no-selection">
+          <p>Select an ontology from the hierarchy to view its details</p>
+        </div>
+      `;
+      document.getElementById('graph-stats').innerHTML = '';
+      
+      // Clear cytoscape container
+      const cytoscapeContainer = document.getElementById('cytoscape-container');
+      if (cytoscapeContainer) {
+        cytoscapeContainer.innerHTML = '';
+      }
+      
+      // Reset tree state
+      setTreeState({}, {});
+      
+      console.log('Dataset closed and UI cleared');
+    } else {
+      console.error('Failed to clear dataset:', response.error || 'Unknown error');
+      alert('Failed to close dataset: ' + (response.error || 'Unknown error'));
+    }
+    
+  } catch (error) {
+    console.error('Error closing dataset:', error);
+    alert('Error closing dataset: ' + error);
+  }
+}
+
 // Make functions globally available for HTML onclick handlers
 window.loadFile = loadFile;
+window.closeDataset = closeDataset;
 window.toggleNode = toggleNode;
 window.switchTab = switchTab;
 window.selectClass = selectClass;

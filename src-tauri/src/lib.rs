@@ -264,6 +264,12 @@ async fn get_import_hierarchy() -> Result<HttpResponse, String> {
 }
 
 #[tauri::command]
+async fn clear_dataset() -> Result<HttpResponse, String> {
+    let response = make_http_request("POST", "/clear_dataset", None).await?;
+    Ok(HttpResponse { data: response })
+}
+
+#[tauri::command]
 async fn get_backend_port() -> Result<u16, String> {
     get_server_port()
 }
@@ -279,6 +285,7 @@ pub fn run() {
         add_triple, 
         get_hierarchy,
         get_import_hierarchy,
+        clear_dataset,
         get_backend_port
     ])
     .setup(|app| {

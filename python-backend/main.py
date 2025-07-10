@@ -57,6 +57,15 @@ def get_global_namespaces():
     """Get the current global namespace registry"""
     return global_namespaces, namespace_conflicts
 
+def clear_dataset():
+    """Clear the current dataset and start fresh"""
+    global current_dataset, current_file_path, current_base_uri
+    current_dataset = None
+    current_file_path = None
+    current_base_uri = None
+    clear_namespace_registry()
+    print("DEBUG: Dataset cleared", file=sys.stderr)
+
 def build_ontology_context_for_ai():
     """Build ontology context from the loaded dataset for AI"""
     global current_dataset, current_file_path, current_base_uri, global_namespaces
@@ -234,19 +243,24 @@ def find_base_uri(file_path, graph=None):
     
     return None
 
-def load_into_dataset_with_base_detection(file_path):
+def load_into_dataset_with_base_detection(file_path, target_dataset=None):
     """Load file into dataset with proper base URI detection"""
     
     # 1. First scan header for @base (most authoritative)
     base_uri = scan_for_base_declaration(file_path)
     
-    # 2. Create dataset
-    dataset = Dataset()
+    # 2. Use provided dataset or create new one
+    if target_dataset is None:
+        dataset = Dataset()
+    else:
+        dataset = target_dataset
     
     if base_uri:
         # We know the base URI, parse directly into correctly named graph
         final_graph = dataset.graph(URIRef(base_uri))
         try:
+            # Clear existing graph if it exists (rewrite behavior)
+            final_graph.remove((None, None, None))
             final_graph.parse(file_path)
         except Exception as e:
             raise
@@ -266,8 +280,9 @@ def load_into_dataset_with_base_detection(file_path):
             if not base_uri:
                 base_uri = f"file://{os.path.abspath(file_path)}"
             
-            # Move data to correctly named graph
+            # Move data to correctly named graph, clearing existing if present
             final_graph = dataset.graph(URIRef(base_uri))
+            final_graph.remove((None, None, None))  # Clear existing graph
             for triple in temp_graph:
                 final_graph.add(triple)
             
@@ -408,8 +423,9 @@ def load_imports_recursive(dataset, main_file_path, main_base_uri, loaded_uris=N
                 import_results.append(import_info)
                 continue
             
-            # Parse into dataset
+            # Parse into dataset - clear existing graph first if present
             import_graph = dataset.graph(URIRef(import_base_uri))
+            import_graph.remove((None, None, None))  # Clear existing graph
             import_graph.parse(actual_file_path)
             
             # Register namespaces from the imported graph
@@ -442,14 +458,20 @@ def load_rdf_file(file_path):
         if not os.path.exists(file_path):
             return {"error": "File does not exist"}
         
-        # Clear namespace registry for new file load
-        clear_namespace_registry()
+        # Initialize dataset if not exists, otherwise add to existing
+        if current_dataset is None:
+            print("DEBUG: Creating new dataset", file=sys.stderr)
+            clear_namespace_registry()
+            dataset = Dataset()
+            current_dataset = dataset
+        else:
+            print("DEBUG: Adding to existing dataset", file=sys.stderr)
+            dataset = current_dataset
         
         # Load into dataset with base URI detection
-        dataset, base_uri = load_into_dataset_with_base_detection(file_path)
+        dataset, base_uri = load_into_dataset_with_base_detection(file_path, dataset)
         
-        # Store globally for persistence
-        current_dataset = dataset
+        # Update global references
         current_file_path = file_path
         current_base_uri = base_uri
         

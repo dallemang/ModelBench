@@ -31,7 +31,8 @@ from main import (
     load_rdf_file,
     get_graph_info,
     query_graph,
-    build_ontology_context_for_ai
+    build_ontology_context_for_ai,
+    clear_dataset
 )
 
 # Import global state from main.py
@@ -116,6 +117,15 @@ def get_graph_info_endpoint():
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
+
+@app.post("/clear_dataset")
+def clear_dataset_endpoint():
+    """Clear the current dataset"""
+    try:
+        clear_dataset()
+        return {"success": True, "message": "Dataset cleared successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to clear dataset: {str(e)}")
 
 @app.post("/query")
 def query_graph_endpoint(request: QueryRequest):

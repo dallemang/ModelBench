@@ -37,6 +37,85 @@ function renderImportDetails(imports, level = 0) {
   `).join('');
 }
 
+// Function to flatten import_results recursively for table display
+function flattenImportResults(imports) {
+  if (!imports || imports.length === 0) return [];
+  
+  let flattened = [];
+  
+  for (const imp of imports) {
+    // Only include loaded, skipped, and error statuses
+    if (imp.status === 'loaded' || imp.status === 'skipped' || imp.status === 'error') {
+      flattened.push({
+        import_uri: imp.import_uri,
+        status: imp.status,
+        file_path: imp.file_path || '',
+        error: imp.error || '',
+        triples_count: imp.triples_count || 0
+      });
+    }
+    
+    // Recursively add nested imports
+    if (imp.nested_imports && imp.nested_imports.length > 0) {
+      flattened = flattened.concat(flattenImportResults(imp.nested_imports));
+    }
+  }
+  
+  return flattened;
+}
+
+// Function to build imports table HTML
+function buildImportsTable(importResults) {
+  if (!importResults || importResults.length === 0) {
+    return `
+      <div style="padding: 20px; text-align: center; color: #666; font-style: italic;">
+        No import data available. Load an ontology to see its imports.
+      </div>
+    `;
+  }
+  
+  const flatImports = flattenImportResults(importResults);
+  
+  if (flatImports.length === 0) {
+    return `
+      <div style="padding: 20px; text-align: center; color: #666; font-style: italic;">
+        No imports found in the loaded ontology.
+      </div>
+    `;
+  }
+  
+  const tableRows = flatImports.map(imp => {
+    const isError = imp.status === 'error';
+    const uriStyle = isError ? 'color: #dc3545; font-weight: bold;' : '';
+    const tooltip = isError && imp.error ? `title="${imp.error}"` : '';
+    
+    return `
+      <tr>
+        <td class="uri-cell" style="${uriStyle}" ${tooltip}>
+          ${imp.import_uri}
+        </td>
+        <td class="file-path-cell">${imp.file_path || ''}</td>
+        <td style="text-align: center;">${imp.triples_count > 0 ? imp.triples_count : ''}</td>
+      </tr>
+    `;
+  }).join('');
+  
+  return `
+    <table class="imports-table">
+      <thead>
+        <tr>
+          <th>Ontology URI</th>
+          <th>Source File</th>
+          <th>Triples</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+    </table>
+  `;
+}
+
 // API base URL will be set by AI interface initialization
 // DO NOT set a hardcoded value here as it overrides port detection
 
@@ -203,6 +282,12 @@ async function loadFile() {
           const namespaces = response.namespaces || {};
           setTreeState({}, namespaces);
           
+          // Populate imports table
+          const importsTableContainer = document.getElementById('imports-table-container');
+          if (importsTableContainer) {
+            importsTableContainer.innerHTML = buildImportsTable(response.imports);
+          }
+          
           // Now build the hierarchy and diagram by querying the backend
           await buildHierarchyFromBackend();
           
@@ -262,6 +347,12 @@ async function closeDataset() {
         </div>
       `;
       document.getElementById('graph-stats').innerHTML = '';
+      
+      // Clear imports table
+      const importsTableContainer = document.getElementById('imports-table-container');
+      if (importsTableContainer) {
+        importsTableContainer.innerHTML = buildImportsTable(null);
+      }
       
       // Clear cytoscape container
       const cytoscapeContainer = document.getElementById('cytoscape-container');

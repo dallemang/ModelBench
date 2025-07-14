@@ -484,6 +484,45 @@
       #run-query-btn:disabled, #fix-query-btn:disabled {
         pointer-events: none;
       }
+      
+      /* Import Details Table Styles */
+      .imports-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .imports-table th {
+        background: #f8f9fa;
+        padding: 12px;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #dee2e6;
+      }
+      .imports-table td {
+        padding: 12px;
+        border-bottom: 1px solid #dee2e6;
+        vertical-align: top;
+      }
+      .imports-table tr:hover {
+        background: #f8f9fa;
+      }
+      .imports-table .uri-cell {
+        font-family: monospace;
+        font-size: 13px;
+        word-break: break-all;
+        max-width: 500px;
+      }
+      .imports-table .file-path-cell {
+        font-family: monospace;
+        font-size: 13px;
+        color: #666;
+        max-width: 400px;
+        word-break: break-all;
+      }
     </style>
   </head>
 
@@ -503,6 +542,7 @@
         <div class="tab-nav">
           <button class="tab-button active" onclick="switchTab('hierarchy')">Class Hierarchy</button>
           <button class="tab-button" onclick="switchTab('import-hierarchy')">Import Hierarchy</button>
+          <button class="tab-button" onclick="switchTab('imports-table')">Import Details</button>
           <button class="tab-button" onclick="switchTab('diagram')">Class Diagram</button>
           <button class="tab-button" onclick="switchTab('query')">SPARQL Query</button>
           <button class="tab-button" onclick="switchTab('ai')">AI Assistant</button>
@@ -541,6 +581,17 @@
                     <p>Select an ontology from the hierarchy to view its details</p>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Import Details Tab -->
+          <div id="tab-imports-table" class="tab-pane">
+            <h3>Import Details</h3>
+            <p>Shows all ontology imports discovered during loading, including their file paths and load status.</p>
+            <div id="imports-table-container">
+              <div style="padding: 20px; text-align: center; color: #666; font-style: italic;">
+                No import data available. Load an ontology to see its imports.
               </div>
             </div>
           </div>

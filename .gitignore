@@ -174,4 +174,8 @@ tramp
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Thumbs.dbdebug_prompt.txt
+Thumbs.db
+debug_prompt.txt
+
+# AI config contains API keys - never commit
+python-backend/ai_config.json

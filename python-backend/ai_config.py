@@ -31,7 +31,7 @@ class AIConfig:
                 },
                 "claude": {
                     "api_key": "",
-                    "model": "claude-3-sonnet-20240229",
+                    "model": "claude-sonnet-4-6",
                     "base_url": "https://api.anthropic.com/v1",
                     "enabled": False
                 }

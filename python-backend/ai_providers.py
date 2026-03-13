@@ -346,9 +346,9 @@ class ClaudeProvider(AIProvider):
     def get_models(self) -> List[str]:
         """Get available Claude models"""
         return [
-            "claude-3-opus-20240229",
-            "claude-3-sonnet-20240229",
-            "claude-3-haiku-20240307"
+            "claude-opus-4-6",
+            "claude-sonnet-4-6",
+            "claude-haiku-4-5-20251001"
         ]
     
     def is_available(self) -> bool:

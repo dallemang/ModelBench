@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tauri + Vanilla</title>
     <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
       .menubar {
         background: #f0f0f0;
@@ -342,11 +343,51 @@
       .ai-message.assistant {
         background: #e9ecef;
         border-left: 4px solid #007bff;
+        position: relative;
+      }
+      .ai-message.assistant .copy-btn {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        padding: 2px 8px;
+        font-size: 11px;
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.15s;
+      }
+      .ai-message.assistant:hover .copy-btn {
+        opacity: 1;
       }
       .ai-message.system {
         background: #fff3cd;
         border-left: 4px solid #ffc107;
         font-style: italic;
+      }
+      .ai-message.tool-call {
+        background: #f0f7ff;
+        border-left: 4px solid #6c757d;
+        font-size: 12px;
+        color: #444;
+        max-width: 100%;
+      }
+      .ai-message.tool-call summary {
+        cursor: pointer;
+        font-weight: 600;
+        color: #555;
+      }
+      .ai-message.tool-call pre {
+        margin: 6px 0 0;
+        padding: 6px 8px;
+        background: #e8f0fe;
+        border-radius: 4px;
+        font-size: 11px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 120px;
+        overflow-y: auto;
       }
       .ai-provider-status {
         display: flex;
@@ -372,6 +413,55 @@
         background: #6c757d;
       }
       
+      /* Markdown rendering inside assistant messages */
+      .ai-message.assistant h1, .ai-message.assistant h2, .ai-message.assistant h3 {
+        margin: 8px 0 4px;
+        font-size: 1em;
+        font-weight: 700;
+      }
+      .ai-message.assistant p {
+        margin: 4px 0;
+      }
+      .ai-message.assistant ul, .ai-message.assistant ol {
+        margin: 4px 0;
+        padding-left: 20px;
+      }
+      .ai-message.assistant li {
+        margin: 2px 0;
+      }
+      .ai-message.assistant pre {
+        margin: 8px 0;
+        padding: 10px;
+        background: #f0f0f0;
+        border-radius: 4px;
+        overflow-x: auto;
+        font-family: 'Courier New', Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      .ai-message.assistant pre code {
+        background: none;
+        padding: 0;
+      }
+      .ai-message.assistant blockquote {
+        border-left: 3px solid #aaa;
+        margin: 4px 0;
+        padding-left: 10px;
+        color: #555;
+      }
+      .ai-message.assistant table {
+        border-collapse: collapse;
+        margin: 8px 0;
+        font-size: 13px;
+      }
+      .ai-message.assistant th, .ai-message.assistant td {
+        border: 1px solid #ccc;
+        padding: 4px 8px;
+      }
+      .ai-message.assistant th {
+        background: #e9ecef;
+      }
+
       /* Code block styling */
       .code-block {
         margin: 10px 0;

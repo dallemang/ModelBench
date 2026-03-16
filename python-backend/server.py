@@ -263,6 +263,57 @@ def dump_dataset():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to dump dataset: {str(e)}")
 
+# SPARQL tool definition for AI tool use
+SPARQL_TOOLS = [
+    {
+        "name": "run_sparql_query",
+        "description": (
+            "Execute a SPARQL SELECT or ASK query against the loaded ontology dataset. "
+            "Use this to look up specific classes, properties, relationships, instances, "
+            "or any other information that is not already in the ontology summary above."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "A valid SPARQL SELECT or ASK query"
+                }
+            },
+            "required": ["query"]
+        }
+    }
+]
+
+def sparql_tool_executor(tool_name: str, tool_input: dict) -> str:
+    """Execute a tool call from the AI and return the result as a string."""
+    if tool_name != "run_sparql_query":
+        return f"Unknown tool: {tool_name}"
+
+    query = tool_input.get("query", "").strip()
+    if not query:
+        return "Error: empty query"
+
+    result = query_graph(query)
+    if "error" in result:
+        return f"Query error: {result['error']}"
+    if not result["results"]:
+        return "Query returned no results."
+
+    lines = []
+    if result["variables"]:
+        lines.append(" | ".join(result["variables"]))
+        lines.append("-" * 40)
+    for row in result["results"][:50]:
+        if isinstance(row, dict):
+            lines.append(" | ".join(str(v) if v is not None else "" for v in row.values()))
+        else:
+            lines.append(str(row))
+    if result["count"] > 50:
+        lines.append(f"... ({result['count']} total results, showing first 50)")
+    return "\n".join(lines)
+
+
 # AI Endpoints
 
 @app.get("/ai/providers")
@@ -367,17 +418,28 @@ def ai_chat(request: ChatRequest):
                         print(f"ERROR: Could not save debug prompt: {e}", file=sys.stderr)
                         print(f"ERROR: Attempted path: {debug_file if 'debug_file' in locals() else 'undefined'}", file=sys.stderr)
         
-        # Send to AI
-        response = provider.chat(
-            messages,
-            max_tokens=request.max_tokens,
-            temperature=request.temperature
-        )
-        
+        # Send to AI, offering SPARQL tool if a dataset is loaded
+        if main.current_dataset is not None:
+            response, tool_calls = provider.chat_with_tools(
+                messages,
+                tools=SPARQL_TOOLS,
+                tool_executor=sparql_tool_executor,
+                max_tokens=request.max_tokens,
+                temperature=request.temperature
+            )
+        else:
+            response = provider.chat(
+                messages,
+                max_tokens=request.max_tokens,
+                temperature=request.temperature
+            )
+            tool_calls = []
+
         return {
             "success": True,
             "provider": provider_name,
-            "content": response
+            "content": response,
+            "tool_calls": tool_calls
         }
         
     except HTTPException:

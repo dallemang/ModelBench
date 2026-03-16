@@ -382,8 +382,15 @@ async function sendAIMessage() {
         const result = await response.json();
         
         if (result.success) {
+            // Show any SPARQL tool calls that were made
+            if (result.tool_calls && result.tool_calls.length > 0) {
+                for (const call of result.tool_calls) {
+                    showToolCall(call);
+                }
+            }
+
             showAIMessage('assistant', result.content);
-            
+
             // Add to conversation history
             chatMessages.push({ role: 'user', content: userMessage });
             chatMessages.push({ role: 'assistant', content: result.content });
@@ -435,6 +442,26 @@ function buildOntologyContext() {
     return context;
 }
 
+// Show a SPARQL tool call as a collapsible entry in the chat
+function showToolCall(call) {
+    const messagesContainer = document.getElementById('ai-chat-messages');
+    if (!messagesContainer) return;
+
+    const query = call.input?.query || JSON.stringify(call.input);
+    const resultPreview = typeof call.result === 'string' ? call.result : JSON.stringify(call.result);
+
+    const div = document.createElement('div');
+    div.className = 'ai-message tool-call';
+    div.innerHTML = `<details>
+        <summary>🔍 SPARQL query executed</summary>
+        <pre>${query.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+        <pre style="background:#e8f5e9; margin-top:4px;">${resultPreview.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+    </details>`;
+
+    messagesContainer.appendChild(div);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
 // Show AI message in chat
 // Format code blocks in AI responses
 function formatCodeBlocks(content) {
@@ -463,9 +490,19 @@ function showAIMessage(role, content) {
     messageDiv.className = `ai-message ${role}`;
     
     if (role === 'assistant') {
-        // Format code blocks for assistant responses
-        const formattedContent = formatCodeBlocks(content);
-        messageDiv.innerHTML = formattedContent;
+        // Render full markdown for assistant responses
+        messageDiv.innerHTML = marked.parse(content);
+        // Add copy button that copies the original markdown
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.textContent = 'Copy';
+        copyBtn.onclick = () => {
+            navigator.clipboard.writeText(content).then(() => {
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => copyBtn.textContent = 'Copy', 1500);
+            });
+        };
+        messageDiv.appendChild(copyBtn);
     } else {
         // Plain text for user and system messages
         messageDiv.textContent = content;

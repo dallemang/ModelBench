@@ -45,6 +45,12 @@ class AIProvider(ABC):
         """Check if provider is available"""
         pass
 
+    def chat_with_tools(self, messages: List[ChatMessage], tools: List[Dict] = None,
+                        tool_executor=None, **kwargs):
+        """Chat with tool use support. Returns (response_text, tool_calls_list).
+        Default implementation ignores tools."""
+        return self.chat(messages, **kwargs), []
+
 class OllamaProvider(AIProvider):
     """Ollama local AI provider"""
     
@@ -343,6 +349,88 @@ class ClaudeProvider(AIProvider):
         except Exception as e:
             raise Exception(f"Claude streaming error: {str(e)}")
     
+    def chat_with_tools(self, messages: List[ChatMessage], tools: List[Dict] = None,
+                        tool_executor=None, **kwargs):
+        """Chat with tool use support, handling the full agentic loop.
+        Returns (response_text, tool_calls) where tool_calls is a list of
+        {"name": ..., "input": ..., "result": ...} dicts."""
+        if not self.api_key:
+            raise Exception("Claude API key not configured")
+        if not tools or not tool_executor:
+            return self.chat(messages, **kwargs), []
+
+        try:
+            claude_messages = []
+            system_message = None
+            for msg in messages:
+                if msg.role == "system":
+                    system_message = msg.content
+                else:
+                    claude_messages.append({"role": msg.role, "content": msg.content})
+
+            payload = {
+                "model": self.model,
+                "max_tokens": kwargs.get('max_tokens', 4096),
+                "messages": claude_messages,
+                "tools": tools
+            }
+            if system_message:
+                payload["system"] = system_message
+
+            all_tool_calls = []
+
+            # Agentic loop: call Claude, execute any tool calls, repeat
+            while True:
+                response = requests.post(
+                    f"{self.base_url}/messages",
+                    headers={
+                        "x-api-key": self.api_key,
+                        "content-type": "application/json",
+                        "anthropic-version": "2023-06-01"
+                    },
+                    json=payload,
+                    timeout=120
+                )
+                response.raise_for_status()
+                result = response.json()
+
+                stop_reason = result.get("stop_reason")
+
+                if stop_reason == "tool_use":
+                    # Append Claude's response (with tool_use blocks) to the conversation
+                    payload["messages"].append({"role": "assistant", "content": result["content"]})
+
+                    # Execute each tool call and collect results
+                    tool_results = []
+                    for block in result["content"]:
+                        if block.get("type") == "tool_use":
+                            try:
+                                output = tool_executor(block["name"], block["input"])
+                            except Exception as e:
+                                output = f"Tool error: {str(e)}"
+                            tool_results.append({
+                                "type": "tool_result",
+                                "tool_use_id": block["id"],
+                                "content": output
+                            })
+                            all_tool_calls.append({
+                                "name": block["name"],
+                                "input": block["input"],
+                                "result": output
+                            })
+
+                    payload["messages"].append({"role": "user", "content": tool_results})
+
+                else:
+                    # end_turn or other: extract text and return
+                    for block in result.get("content", []):
+                        if block.get("type") == "text":
+                            return block["text"], all_tool_calls
+                    return "", all_tool_calls
+
+        except Exception as e:
+            raise Exception(f"Claude API error: {str(e)}")
+
     def get_models(self) -> List[str]:
         """Get available Claude models"""
         return [

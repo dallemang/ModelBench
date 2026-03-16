@@ -375,6 +375,71 @@ async function closeDataset() {
   }
 }
 
+// Navigate to a class: switch to hierarchy tab then select it
+function navigateToClass(uri) {
+  switchTab('hierarchy');
+  // Small delay so the tab is visible before selectClass tries to scroll
+  setTimeout(() => selectClass(uri), 50);
+}
+
+// Search classes by label or URI fragment, return up to 15 matches.
+// Ranking: exact label match > label starts-with > label contains > URI contains
+function searchClasses(query) {
+  const data = getClassData();
+  const q = query.toLowerCase();
+  const results = [];
+  for (const cls of Object.values(data)) {
+    const label = cls.label.toLowerCase();
+    const uri = cls.uri.toLowerCase();
+    if (label === q)                      results.push({ cls, rank: 0 });
+    else if (label.startsWith(q))         results.push({ cls, rank: 1 });
+    else if (label.includes(q))           results.push({ cls, rank: 2 });
+    else if (uri.includes(q))             results.push({ cls, rank: 3 });
+  }
+  results.sort((a, b) => a.rank - b.rank || a.cls.label.localeCompare(b.cls.label));
+  return results.slice(0, 15).map(r => r.cls);
+}
+
+// Handle search input in the hierarchy tab
+function onClassSearch(query) {
+  const resultsDiv = document.getElementById('class-search-results');
+  if (!resultsDiv) return;
+
+  if (!query.trim()) {
+    resultsDiv.style.display = 'none';
+    resultsDiv.innerHTML = '';
+    return;
+  }
+
+  const matches = searchClasses(query);
+  if (matches.length === 0) {
+    resultsDiv.style.display = 'none';
+    return;
+  }
+
+  resultsDiv.innerHTML = '';
+  matches.forEach(cls => {
+    const div = document.createElement('div');
+    div.style.cssText = 'padding: 6px 10px; cursor: pointer; border-bottom: 1px solid #eee;';
+    div.onmouseover = () => div.style.background = '#f0f7ff';
+    div.onmouseout = () => div.style.background = '';
+    const label = document.createElement('strong');
+    label.textContent = cls.label;
+    const uri = document.createElement('span');
+    uri.textContent = ' ' + cls.uri;
+    uri.style.cssText = 'font-size: 11px; color: #888; font-family: monospace;';
+    div.appendChild(label);
+    div.appendChild(uri);
+    div.onclick = () => {
+      document.getElementById('class-search-input').value = '';
+      resultsDiv.style.display = 'none';
+      navigateToClass(cls.uri);
+    };
+    resultsDiv.appendChild(div);
+  });
+  resultsDiv.style.display = 'block';
+}
+
 // Make functions globally available for HTML onclick handlers
 window.loadFile = loadFile;
 window.closeDataset = closeDataset;
@@ -386,6 +451,9 @@ window.resetDiagramLayout = resetLayout;
 window.fitDiagram = fitToScreen;
 window.debugDiagramData = debugDiagramData;
 window.toggleLayoutType = toggleLayoutType;
+window.navigateToClass = navigateToClass;
+window.getClassData = getClassData;
+window.onClassSearch = onClassSearch;
 
 // Expose state functions for debugging
 window.getClassData = getClassData;

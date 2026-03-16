@@ -239,11 +239,12 @@ function handleResizeEnd() {
 // Format individual result values
 function formatResultValue(value) {
     if (!value) return '<em style="color: #999;">null</em>';
-    
-    const escaped = escapeHtml(String(value));
-    
+
+    const str = String(value);
+    const escaped = escapeHtml(str);
+
     // If it looks like a URI, make it a bit more readable
-    if (escaped.startsWith('http://') || escaped.startsWith('https://')) {
+    if (str.startsWith('http://') || str.startsWith('https://')) {
         // Extract local name for display, but show full URI in title
         let displayName = escaped;
         if (escaped.includes('#')) {
@@ -251,10 +252,19 @@ function formatResultValue(value) {
         } else if (escaped.includes('/')) {
             displayName = escaped.split('/').pop();
         }
-        
+
+        // If this URI is a known class, make it a navigation link
+        const classData = window.getClassData && window.getClassData();
+        if (classData && classData[str]) {
+            const safeUri = escaped.replace(/'/g, '&#39;');
+            return `<a href="#" title="${escaped}"
+                onclick="window.navigateToClass('${safeUri}'); return false;"
+                style="font-family: monospace; color: #007bff; text-decoration: none;">${displayName} &#x2197;</a>`;
+        }
+
         return `<span title="${escaped}" style="font-family: monospace; color: #0066cc;">${displayName}</span>`;
     }
-    
+
     return `<span style="font-family: monospace;">${escaped}</span>`;
 }
 

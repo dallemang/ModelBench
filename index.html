@@ -622,7 +622,7 @@
         <span class="menu-title">File</span>
         <div class="menu-dropdown">
           <button onclick="loadFile()">Load...</button>
-          <button onclick="closeDataset()">Close</button>
+          <button onclick="closeDataset()">Clear</button>
         </div>
       </div>
     </div>
@@ -698,7 +698,12 @@
               <div id="diagram-toolbar">
                 <button onclick="resetDiagramLayout()">Reset Layout</button>
                 <button onclick="fitDiagram()">Fit to Screen</button>
-                <button onclick="toggleLayoutType()">Switch to Traditional Layout</button>
+                <label for="layout-select" style="font-size:13px;">Layout:</label>
+                <select id="layout-select" onchange="setLayoutType(this.value)" style="font-size:13px; padding:3px 6px;">
+                  <option value="rings">Rings by Ontology</option>
+                  <option value="traditional">Single Ring</option>
+                  <option value="topdown">Top-Down</option>
+                </select>
                 <button onclick="debugDiagramData()">Debug Data</button>
               </div>
               <div id="cytoscape-container"></div>

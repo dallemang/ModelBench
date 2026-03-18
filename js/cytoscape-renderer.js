@@ -55,6 +55,9 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
   } else {
     graphData = buildCytoscapeData(hierarchy);
   }
+
+  // For topdown, node positions from the builder are ignored — breadthfirst handles it
+  const usePresetLayout = layoutType !== 'topdown';
   
   // Store the color mapping globally for hierarchy tree coordination
   if (graphData.graphColorMap) {
@@ -63,16 +66,26 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
   
   const { nodes, edges } = graphData;
   
+  const layoutConfig = usePresetLayout
+    ? {
+        name: 'preset',
+        animate: userViewportState ? false : true,
+        animationDuration: userViewportState ? 0 : 1000
+      }
+    : {
+        name: 'breadthfirst',
+        directed: true,
+        spacingFactor: 1.2,
+        animate: true,
+        animationDuration: 1000
+      };
+
   try {
     cytoscapeInstance = cytoscape({
       container: container,
       elements: [...nodes, ...edges],
       style: getCytoscapeStyle(nodes),
-      layout: {
-        name: 'preset',
-        animate: userViewportState ? false : true, // Don't animate if we're restoring viewport
-        animationDuration: userViewportState ? 0 : 1000
-      },
+      layout: layoutConfig,
       wheelSensitivity: 0.1,
       minZoom: 0.1,
       maxZoom: 3
@@ -417,7 +430,7 @@ function getCytoscapeStyle(nodes = []) {
         'target-arrow-shape': 'triangle',
         'curve-style': 'bezier',
         'arrow-scale': 1.2,
-        'label': 'data(label)',
+        'label': ele => ele.data('label') ? `\u2060\n${ele.data('label')}\n\u2060` : '',
         'font-size': '15px',
         'text-rotation': 'autorotate',
         'text-margin-y': -10,

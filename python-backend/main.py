@@ -178,7 +178,7 @@ def build_ontology_summary_for_ai():
         traceback.print_exc()
         return None
 
-def scan_for_base_declaration(file_path, max_lines=50):
+def scan_for_base_declaration(file_path, max_lines=500):
     """Scan file header for @base or @prefix : declarations"""
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -615,12 +615,28 @@ def query_graph(sparql_query):
         # Execute query on merged graph
         results = merged_graph.query(sparql_query)
         
-        # Convert results to structured format
+        # DESCRIBE or CONSTRUCT — result is a graph of triples
+        if hasattr(results, 'type') and results.type in ('DESCRIBE', 'CONSTRUCT'):
+            result_graph = Graph()
+            for triple in results:
+                result_graph.add(triple)
+            # Bind all current ontology namespaces for readable Turtle output
+            ns_dict, _ = get_global_namespaces()
+            for prefix, ns_uri in ns_dict.items():
+                result_graph.bind(prefix, ns_uri)
+            turtle_str = result_graph.serialize(format='turtle')
+            return {
+                "success": True,
+                "result_type": "graph",
+                "turtle": turtle_str,
+                "count": len(result_graph)
+            }
+
+        # SELECT
         result_list = []
         variables = []
-        
+
         if hasattr(results, 'vars') and results.vars:
-            # SELECT query with variables
             variables = [str(var) for var in results.vars]
             for row in results:
                 row_dict = {}
@@ -629,11 +645,12 @@ def query_graph(sparql_query):
                     row_dict[var] = str(value) if value is not None else None
                 result_list.append(row_dict)
         else:
-            # ASK query or no variables
+            # ASK query
             result_list = [str(row) for row in results]
-        
+
         return {
             "success": True,
+            "result_type": "table",
             "results": result_list,
             "variables": variables,
             "count": len(result_list)

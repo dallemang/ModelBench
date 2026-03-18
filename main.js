@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { createClassDiagram, resetViewportState } from './js/cytoscape-renderer.js';
-import { switchTab, resetLayout, fitToScreen, debugDiagramData, toggleLayoutType, setHierarchyData, getCurrentLayoutType } from './js/ui-controls.js';
+import { switchTab, resetLayout, fitToScreen, debugDiagramData, setLayoutType, setHierarchyData, getCurrentLayoutType } from './js/ui-controls.js';
 import { buildTreeHtml, selectClass, selectOntology, toggleNode, setTreeState, getClassData, getNamespaces, countClasses } from './js/tree-builder.js';
 import { assignColorsToGraphs } from './js/color-utils.js';
 
@@ -375,6 +375,24 @@ async function closeDataset() {
   }
 }
 
+// Group all top-level external/inferred nodes under a single synthetic [EXTERNAL] root
+function groupExternalClasses(hierarchy) {
+  const defined = hierarchy.filter(n => !n.is_inferred);
+  const external = hierarchy.filter(n => n.is_inferred);
+  if (external.length === 0) return hierarchy;
+
+  const externalRoot = {
+    uri: 'urn:ontobench:external-root',
+    label: '[EXTERNAL]',
+    is_inferred: false,
+    children: external,
+    properties: [],
+    annotations: [],
+    graph_source: 'synthetic'
+  };
+  return [...defined, externalRoot];
+}
+
 // Navigate to a class: switch to hierarchy tab then select it
 function navigateToClass(uri) {
   switchTab('hierarchy');
@@ -450,7 +468,7 @@ window.selectOntology = selectOntology;
 window.resetDiagramLayout = resetLayout;
 window.fitDiagram = fitToScreen;
 window.debugDiagramData = debugDiagramData;
-window.toggleLayoutType = toggleLayoutType;
+window.setLayoutType = setLayoutType;
 window.navigateToClass = navigateToClass;
 window.getClassData = getClassData;
 window.onClassSearch = onClassSearch;
@@ -482,15 +500,20 @@ async function buildHierarchyFromBackend() {
         
         window.currentGraphColorMap = graphColorMap;
         
-        // Count total classes and update the title
-        const totalClasses = countClasses(response.hierarchy);
+        // Count total classes and update the title (before grouping, so counts are accurate)
+        const { total, defined, external } = countClasses(response.hierarchy);
         const hierarchyTitle = document.querySelector('#tab-hierarchy h3');
         if (hierarchyTitle) {
-          hierarchyTitle.textContent = `Class Hierarchy (${totalClasses} classes)`;
+          hierarchyTitle.textContent = external > 0
+            ? `Class Hierarchy (${total} classes: ${defined} defined, ${external} external)`
+            : `Class Hierarchy (${total} classes)`;
         }
-        
+
+        // Group all top-level external/inferred nodes under a single [EXTERNAL] mock root
+        const displayHierarchy = groupExternalClasses(response.hierarchy);
+
         const hierarchyTree = document.getElementById('hierarchy-tree');
-        hierarchyTree.innerHTML = buildTreeHtml(response.hierarchy, graphColorMap);
+        hierarchyTree.innerHTML = buildTreeHtml(displayHierarchy, graphColorMap);
         
         document.getElementById('class-details').innerHTML = `
           <div class="no-selection">

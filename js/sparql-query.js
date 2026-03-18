@@ -42,7 +42,8 @@ async function runSparqlQuery() {
         } else if (data && data.success) {
             // Display results
             displayQueryResults(data, resultsDiv);
-            showQueryStatus(`Query completed successfully. ${data.count || data.results?.length || 0} results.`, 'success');
+            const countLabel = data.result_type === 'graph' ? `${data.count} triples` : `${data.count || data.results?.length || 0} results`;
+            showQueryStatus(`Query completed successfully. ${countLabel}.`, 'success');
             // Disable Fix button on successful query
             disableFixButton();
         } else {
@@ -85,8 +86,17 @@ async function runSparqlQuery() {
     }
 }
 
-// Display query results in table format
+// Display query results — table for SELECT, Turtle block for DESCRIBE/CONSTRUCT
 function displayQueryResults(data, container) {
+    if (data.result_type === 'graph') {
+        if (!data.turtle || data.count === 0) {
+            container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No results found.</div>';
+            return;
+        }
+        container.innerHTML = `<pre style="margin:0; padding:14px; font-family:'Courier New',Consolas,monospace; font-size:12px; line-height:1.5; white-space:pre-wrap; word-break:break-all; background:#fff;">${escapeHtml(data.turtle)}</pre>`;
+        return;
+    }
+
     if (!data.results || data.results.length === 0) {
         container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">No results found.</div>';
         return;

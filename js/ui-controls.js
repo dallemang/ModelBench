@@ -96,39 +96,26 @@ let currentLayoutType = 'rings';
 let currentHierarchyData = null;
 
 /**
- * Toggle between ring and traditional layout types
+ * Set layout type from the dropdown
+ * @param {string} layoutType - 'rings', 'traditional', or 'topdown'
  */
-export function toggleLayoutType() {
-  // Toggle layout type
-  currentLayoutType = currentLayoutType === 'rings' ? 'traditional' : 'rings';
-  
-  // Update button text
-  const button = document.querySelector('button[onclick="toggleLayoutType()"]');
-  if (button) {
-    button.textContent = currentLayoutType === 'rings' 
-      ? 'Switch to Traditional Layout' 
-      : 'Switch to Ring Layout';
-  }
-  
-  // Recreate diagram with new layout if we have data
+export function setLayoutType(layoutType) {
+  currentLayoutType = layoutType;
+  window.currentLayoutType = currentLayoutType;
+
   if (currentHierarchyData) {
     createClassDiagram(currentHierarchyData, currentLayoutType);
-    
-    // Fit the diagram after a short delay
-    setTimeout(() => {
-      fitDiagram();
-    }, 500);
+    setTimeout(() => fitDiagram(), 500);
   }
-  
-  // Store globally for access
-  window.currentLayoutType = currentLayoutType;
 }
 
 /**
  * Store hierarchy data for layout switching
  * @param {Array} hierarchyData - The hierarchy data
+ * @param {string} [type] - 'import' to skip storing (import hierarchy should not affect diagram toggle)
  */
-export function setHierarchyData(hierarchyData) {
+export function setHierarchyData(hierarchyData, type) {
+  if (type === 'import') return;
   currentHierarchyData = hierarchyData;
 }
 

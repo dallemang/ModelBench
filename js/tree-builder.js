@@ -42,17 +42,20 @@ export function getNamespaces() {
  * @param {Array} nodes - Array of hierarchy nodes
  * @returns {number} Total class count
  */
+// Returns { total, defined, external }
 export function countClasses(nodes) {
-  if (!nodes || nodes.length === 0) return 0;
-  
-  let count = 0;
+  if (!nodes || nodes.length === 0) return { total: 0, defined: 0, external: 0 };
+
+  let defined = 0, external = 0;
   for (const node of nodes) {
-    count += 1; // Count this node
+    if (node.is_inferred) external++; else defined++;
     if (node.children && node.children.length > 0) {
-      count += countClasses(node.children); // Count children recursively
+      const child = countClasses(node.children);
+      defined += child.defined;
+      external += child.external;
     }
   }
-  return count;
+  return { total: defined + external, defined, external };
 }
 
 /**

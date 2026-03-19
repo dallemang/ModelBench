@@ -137,9 +137,11 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
       };
 
   try {
+    const allElements = [...nodes, ...edges];
+    console.log('[cytoscape-data] Full elements array:', JSON.stringify(allElements, null, 2));
     cytoscapeInstance = cytoscape({
       container: container,
-      elements: [...nodes, ...edges],
+      elements: allElements,
       style: getCytoscapeStyle(nodes),
       layout: layoutConfig,
       wheelSensitivity: 0.1,
@@ -488,6 +490,7 @@ function getCytoscapeStyle(nodes = []) {
         'arrow-scale': 1.2,
         'label': ele => ele.data('label') ? `\u2060\n${ele.data('label')}\n\u2060` : '',
         'font-size': '15px',
+        'text-wrap': 'wrap',
         'text-rotation': 'autorotate',
         'text-margin-y': -10,
         'color': '#333333',

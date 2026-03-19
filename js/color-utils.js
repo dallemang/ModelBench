@@ -8,33 +8,37 @@
  * @returns {Array} Array of color scheme objects
  */
 export function generateColorSchemes(numGraphs) {
-  // Base colors distributed around the color wheel for maximum distinction
+  // Use golden angle (~137.5°) to distribute hues maximally apart,
+  // even for small numbers of graphs where even spacing can cluster.
+  const goldenAngle = 137.508;
   const baseHues = [];
   for (let i = 0; i < numGraphs; i++) {
-    baseHues.push((i * 360) / numGraphs);
+    baseHues.push((i * goldenAngle) % 360);
   }
-  
+
   return baseHues.map(hue => {
     // Avoid pure red (0-20 degrees) - skip to red-orange instead
     let adjustedHue = hue;
     if (hue >= 0 && hue <= 20) {
       adjustedHue = 25; // Red-orange instead of red
     }
-    
-    // Generate pale HSL colors with high lightness for better readability
-    const rootSaturation = 60;     // More saturated for roots
-    const descendantSaturation = 45; // Less saturated for descendants
-    const orphanedSaturation = 30;   // Even less for orphaned nodes
-    const lightness = 75;           // Much lighter for pale colors
-    
+
+    // High saturation + moderate lightness for vivid, distinctive colors
+    const rootSaturation = 70;
+    const descendantSaturation = 55;
+    const orphanedSaturation = 35;
+    const rootLightness = 65;
+    const descendantLightness = 72;
+    const orphanedLightness = 78;
+
     return {
-      root: `hsl(${adjustedHue}, ${rootSaturation}%, ${lightness}%)`,
-      descendant: `hsl(${adjustedHue}, ${descendantSaturation}%, ${lightness}%)`,
-      orphaned: `hsl(${adjustedHue}, ${orphanedSaturation}%, ${lightness}%)`,
+      root: `hsl(${adjustedHue}, ${rootSaturation}%, ${rootLightness}%)`,
+      descendant: `hsl(${adjustedHue}, ${descendantSaturation}%, ${descendantLightness}%)`,
+      orphaned: `hsl(${adjustedHue}, ${orphanedSaturation}%, ${orphanedLightness}%)`,
       // Darker versions for text (better contrast)
-      rootText: `hsl(${adjustedHue}, ${rootSaturation + 20}%, ${lightness - 35}%)`,
-      descendantText: `hsl(${adjustedHue}, ${descendantSaturation + 20}%, ${lightness - 35}%)`,
-      orphanedText: `hsl(${adjustedHue}, ${orphanedSaturation + 20}%, ${lightness - 35}%)`
+      rootText: `hsl(${adjustedHue}, ${rootSaturation + 20}%, ${rootLightness - 35}%)`,
+      descendantText: `hsl(${adjustedHue}, ${descendantSaturation + 20}%, ${descendantLightness - 35}%)`,
+      orphanedText: `hsl(${adjustedHue}, ${orphanedSaturation + 20}%, ${orphanedLightness - 35}%)`
     };
   });
 }

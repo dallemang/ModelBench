@@ -124,9 +124,9 @@ function maxSubtreeDepth(node) {
 }
 
 /**
- * Estimate total radius of influence for a ring (ring radius + average subtree extent).
- * Uses average depth rather than max, since subtrees radiate outward in different
- * directions and only one points in any given direction.
+ * Estimate total radius of influence for a ring (ring radius + subtree extent).
+ * Uses the max subtree depth since the deepest subtree determines how far
+ * the ring extends toward neighboring rings.
  */
 function estimateRingFootprint(roots) {
   if (!roots || roots.length === 0) return 100;
@@ -136,8 +136,8 @@ function estimateRingFootprint(roots) {
     ? 0
     : (roots.length * minSpacing) / (2 * Math.PI);
   const depths = roots.map(maxSubtreeDepth);
-  const avgDepth = depths.reduce((sum, d) => sum + d, 0) / depths.length;
-  return ringRadius + avgDepth * layerHeight + 60;
+  const maxDepth = Math.max(...depths, 0);
+  return ringRadius + maxDepth * layerHeight + 60;
 }
 
 // ── Force-directed ring placement ───────────────────────────────
@@ -233,38 +233,113 @@ function forceDirectedRingPlacement(graphUris, graphPairWeights, graphFootprints
     temperature *= cooling;
   }
 
-  // ── Phase 2: rescale to real pixel coordinates ──
-  // For every pair, compute the ratio of actual distance to required distance.
-  // The tightest pair (smallest ratio) determines the global scale factor.
-  const padding = 100; // px gap between ring edges
-  let minRatio = Infinity;
+  // ── Phase 2: place rings at correct pixel distances ──
+  // Keep DIRECTIONS from force sim, but DISCARD distances.
+  // Each ring's distance from center is computed from its footprint
+  // plus edge-count-aware padding to its nearest neighbor.
+  const basePadding = 100; // px base gap between ring edges
+  const edgeSpacePerLink = 15; // extra px per cross-ring edge between a pair
 
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const a = graphUris[i], b = graphUris[j];
-      const dx = pos[a].x - pos[b].x;
-      const dy = pos[a].y - pos[b].y;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
-
-      const requiredDist =
-        (graphFootprints[a] || 200) + (graphFootprints[b] || 200) + padding;
-      const ratio = dist / requiredDist;
-      if (ratio < minRatio) minRatio = ratio;
-    }
+  function pairKey(a, b) {
+    return a < b ? `${a}\0${b}` : `${b}\0${a}`;
   }
 
-  // Scale so the tightest pair just fits
-  const scale = minRatio > 0 ? 1 / minRatio : 1;
+  function requiredDist(a, b) {
+    const edgeCount = graphPairWeights[pairKey(a, b)] || 0;
+    return (graphFootprints[a] || 200) + (graphFootprints[b] || 200) + basePadding + edgeCount * edgeSpacePerLink;
+  }
 
-  // Center the layout at origin and apply scale
+  // Center at origin, then normalize all rings to unit direction vectors
   let cx = 0, cy = 0;
   graphUris.forEach(uri => { cx += pos[uri].x; cy += pos[uri].y; });
   cx /= n; cy /= n;
 
+  const directions = {};
   graphUris.forEach(uri => {
-    pos[uri].x = (pos[uri].x - cx) * scale;
-    pos[uri].y = (pos[uri].y - cy) * scale;
+    const dx = pos[uri].x - cx;
+    const dy = pos[uri].y - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 0.001;
+    directions[uri] = { x: dx / dist, y: dy / dist };
   });
+
+  // Place rings iteratively: start from the most connected ring (center),
+  // then place each subsequent ring at the correct distance from already-placed rings.
+  // The most connected ring goes at (0,0).
+  const totalConnections = {};
+  graphUris.forEach(uri => {
+    let total = 0;
+    for (const [key, weight] of Object.entries(graphPairWeights)) {
+      if (key.includes(uri)) total += weight;
+    }
+    totalConnections[uri] = total;
+  });
+
+  const placementOrder = [...graphUris].sort((a, b) => totalConnections[b] - totalConnections[a]);
+
+  const placed = new Set();
+  const finalPos = {};
+
+  // Most connected ring at center
+  finalPos[placementOrder[0]] = { x: 0, y: 0 };
+  placed.add(placementOrder[0]);
+
+  // Place remaining rings along their force-sim direction, at the distance
+  // required by their nearest already-placed neighbor
+  for (let i = 1; i < placementOrder.length; i++) {
+    const uri = placementOrder[i];
+    const dir = directions[uri];
+
+    // Find the required distance to the nearest placed neighbor
+    let nearestDist = Infinity;
+    for (const placedUri of placed) {
+      const req = requiredDist(uri, placedUri);
+      // Project: how far along our direction is this placed ring?
+      // Use actual required distance to the closest placed ring
+      const pdx = finalPos[placedUri].x;
+      const pdy = finalPos[placedUri].y;
+      const distFromCenter = Math.sqrt(pdx * pdx + pdy * pdy);
+      const totalNeeded = distFromCenter + req;
+      if (totalNeeded < nearestDist) nearestDist = totalNeeded;
+    }
+
+    // Place along the direction from the force sim
+    finalPos[uri] = {
+      x: dir.x * nearestDist,
+      y: dir.y * nearestDist
+    };
+    placed.add(uri);
+  }
+
+  // Recenter
+  cx = 0; cy = 0;
+  graphUris.forEach(uri => { cx += finalPos[uri].x; cy += finalPos[uri].y; });
+  cx /= n; cy /= n;
+  graphUris.forEach(uri => {
+    pos[uri].x = finalPos[uri].x - cx;
+    pos[uri].y = finalPos[uri].y - cy;
+  });
+
+  // Safety: push apart any overlapping pairs
+  for (let iter = 0; iter < 20; iter++) {
+    let anyPushed = false;
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const a = graphUris[i], b = graphUris[j];
+        const dx = pos[a].x - pos[b].x;
+        const dy = pos[a].y - pos[b].y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        const minDist = requiredDist(a, b);
+        if (dist < minDist) {
+          const push = (minDist - dist) / 2;
+          const ux = dx / dist, uy = dy / dist;
+          pos[a].x += ux * push;  pos[a].y += uy * push;
+          pos[b].x -= ux * push;  pos[b].y -= uy * push;
+          anyPushed = true;
+        }
+      }
+    }
+    if (!anyPushed) break;
+  }
 
   return pos;
 }

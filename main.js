@@ -524,9 +524,10 @@ async function buildHierarchyFromBackend() {
         const hierarchyCopy = JSON.parse(JSON.stringify(response.hierarchy));
         
         setHierarchyData(hierarchyCopy);
-        
-        const layoutType = getCurrentLayoutType();
-        createClassDiagram(hierarchyCopy, layoutType);
+
+        // Defer diagram creation until the diagram tab is shown,
+        // so Cytoscape gets a properly-sized container.
+        window.pendingDiagramData = hierarchyCopy;
       } else {
         const hierarchyTree = document.getElementById('hierarchy-tree');
         hierarchyTree.innerHTML = `

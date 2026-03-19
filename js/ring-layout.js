@@ -341,6 +341,13 @@ function forceDirectedRingPlacement(graphUris, graphPairWeights, graphFootprints
     if (!anyPushed) break;
   }
 
+  // Compact: bring rings 20% closer together
+  const compactScale = 0.8;
+  graphUris.forEach(uri => {
+    pos[uri].x *= compactScale;
+    pos[uri].y *= compactScale;
+  });
+
   return pos;
 }
 

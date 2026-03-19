@@ -30,17 +30,18 @@ export function switchTab(tabName) {
     activePane.classList.add('diagram-active');
     document.querySelector('.tab-content').classList.add('diagram-active');
     
-    const cytoscapeInstance = getCytoscapeInstance();
-    if (cytoscapeInstance) {
-      setTimeout(() => {
+    // If diagram hasn't been created yet, create it now that the container is visible
+    if (window.pendingDiagramData) {
+      const layoutType = getCurrentLayoutType();
+      createClassDiagram(window.pendingDiagramData, layoutType);
+      window.pendingDiagramData = null;
+      setTimeout(() => fitDiagram(), 200);
+    } else {
+      const cytoscapeInstance = getCytoscapeInstance();
+      if (cytoscapeInstance) {
         cytoscapeInstance.resize();
-        
-        // If this is the first time showing the diagram, fit it properly
-        if (!window.diagramHasBeenShown) {
-          fitDiagram();
-          window.diagramHasBeenShown = true;
-        }
-      }, 300);
+        setTimeout(() => fitDiagram(), 200);
+      }
     }
   }
   

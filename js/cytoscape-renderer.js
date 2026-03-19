@@ -8,6 +8,62 @@ import { buildCytoscapeDataWithRings } from './cytoscape-ring-builder.js';
 // Global Cytoscape instance
 let cytoscapeInstance = null;
 
+// Box dimensions for class nodes
+const NODE_WIDTH = 120;
+const NODE_HEIGHT = 40;
+const NODE_PADDING = 8; // px padding inside box
+
+/**
+ * Compute the largest font size that fits a label inside the node box.
+ * Handles word-wrapping: tries to split the label into lines that fit
+ * the box width, then scales to fit both width and height.
+ */
+function computeFontSize(label) {
+  if (!label) return 12;
+
+  const maxWidth = NODE_WIDTH - NODE_PADDING;
+  const maxHeight = NODE_HEIGHT - NODE_PADDING;
+
+  // Approximate character width as 0.5 * fontSize for bold text
+  const charWidthRatio = 0.5;
+  // Line height as 1.15 * fontSize
+  const lineHeightRatio = 1.15;
+
+  // Try font sizes from large to small
+  for (let size = 24; size >= 7; size--) {
+    const charWidth = size * charWidthRatio;
+    const charsPerLine = Math.floor(maxWidth / charWidth);
+    if (charsPerLine < 1) continue;
+
+    // Word-wrap the label
+    const words = label.split(/\s+/);
+    const lines = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? currentLine + ' ' + word : word;
+      if (testLine.length <= charsPerLine) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+
+    // Check if it fits
+    const textHeight = lines.length * size * lineHeightRatio;
+    const longestLine = Math.max(...lines.map(l => l.length));
+    const textWidth = longestLine * charWidth;
+
+    if (textWidth <= maxWidth && textHeight <= maxHeight) {
+      return size;
+    }
+  }
+
+  return 7; // minimum
+}
+
 // Global viewport state - the user's preferred zoom/pan
 let userViewportState = null;
 
@@ -211,12 +267,12 @@ function getCytoscapeStyle(nodes = []) {
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
-        'font-size': '12px',
+        'font-size': function(ele) { return computeFontSize(ele.data('label')) + 'px'; },
         'font-weight': 'bold',
         'text-wrap': 'wrap',
-        'text-max-width': '100px',
-        'width': '120px',
-        'height': '40px',
+        'text-max-width': (NODE_WIDTH - NODE_PADDING * 2) + 'px',
+        'width': NODE_WIDTH + 'px',
+        'height': NODE_HEIGHT + 'px',
         'shape': 'rectangle',
         'border-width': '3px',
         'border-color': darkenColor(scheme.root),
@@ -234,12 +290,12 @@ function getCytoscapeStyle(nodes = []) {
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
-        'font-size': '12px',
+        'font-size': function(ele) { return computeFontSize(ele.data('label')) + 'px'; },
         'font-weight': 'bold',
         'text-wrap': 'wrap',
-        'text-max-width': '100px',
-        'width': '120px',
-        'height': '40px',
+        'text-max-width': (NODE_WIDTH - NODE_PADDING * 2) + 'px',
+        'width': NODE_WIDTH + 'px',
+        'height': NODE_HEIGHT + 'px',
         'shape': 'rectangle',
         'border-width': '2px',
         'border-color': darkenColor(scheme.descendant),
@@ -260,12 +316,12 @@ function getCytoscapeStyle(nodes = []) {
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
-        'font-size': '12px',
+        'font-size': function(ele) { return computeFontSize(ele.data('label')) + 'px'; },
         'font-weight': 'bold',
         'text-wrap': 'wrap',
-        'text-max-width': '100px',
-        'width': '120px',
-        'height': '40px',
+        'text-max-width': (NODE_WIDTH - NODE_PADDING * 2) + 'px',
+        'width': NODE_WIDTH + 'px',
+        'height': NODE_HEIGHT + 'px',
         'shape': 'rectangle',
         'border-width': '2px',
         'border-color': darkenColor(scheme.orphaned),
@@ -287,12 +343,12 @@ function getCytoscapeStyle(nodes = []) {
       'label': 'data(label)',
       'text-valign': 'center',
       'text-halign': 'center',
-      'font-size': '12px',
+      'font-size': function(ele) { return computeFontSize(ele.data('label')) + 'px'; },
       'font-weight': 'bold',
       'text-wrap': 'wrap',
-      'text-max-width': '100px',
-      'width': '120px',
-      'height': '40px',
+      'text-max-width': (NODE_WIDTH - NODE_PADDING * 2) + 'px',
+      'width': NODE_WIDTH + 'px',
+      'height': NODE_HEIGHT + 'px',
       'shape': 'rectangle',
       'border-width': '2px',
       'border-color': darkenColor('#6C757D'),
@@ -323,12 +379,12 @@ function getCytoscapeStyle(nodes = []) {
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
-        'font-size': '12px',
+        'font-size': function(ele) { return computeFontSize(ele.data('label')) + 'px'; },
         'font-weight': 'bold',
         'text-wrap': 'wrap',
-        'text-max-width': '100px',
-        'width': '120px',
-        'height': '40px',
+        'text-max-width': (NODE_WIDTH - NODE_PADDING * 2) + 'px',
+        'width': NODE_WIDTH + 'px',
+        'height': NODE_HEIGHT + 'px',
         'shape': 'rectangle',
         'border-width': '3px',
         'text-outline-width': '0px'
@@ -353,12 +409,12 @@ function getCytoscapeStyle(nodes = []) {
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
-        'font-size': '12px',
+        'font-size': function(ele) { return computeFontSize(ele.data('label')) + 'px'; },
         'font-weight': 'bold',
         'text-wrap': 'wrap',
-        'text-max-width': '100px',
-        'width': '120px',
-        'height': '40px',
+        'text-max-width': (NODE_WIDTH - NODE_PADDING * 2) + 'px',
+        'width': NODE_WIDTH + 'px',
+        'height': NODE_HEIGHT + 'px',
         'shape': 'rectangle',
         'border-width': '2px',
         'text-outline-width': '0px'
@@ -390,12 +446,12 @@ function getCytoscapeStyle(nodes = []) {
         'label': 'data(label)',
         'text-valign': 'center',
         'text-halign': 'center',
-        'font-size': '12px',
+        'font-size': function(ele) { return computeFontSize(ele.data('label')) + 'px'; },
         'font-weight': 'bold',
         'text-wrap': 'wrap',
-        'text-max-width': '100px',
-        'width': '120px',
-        'height': '40px',
+        'text-max-width': (NODE_WIDTH - NODE_PADDING * 2) + 'px',
+        'width': NODE_WIDTH + 'px',
+        'height': NODE_HEIGHT + 'px',
         'shape': 'rectangle',
         'border-width': '2px',
         'text-outline-width': '0px'

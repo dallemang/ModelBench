@@ -131,7 +131,7 @@ function maxSubtreeDepth(node) {
 function estimateRingFootprint(roots) {
   if (!roots || roots.length === 0) return 100;
   const minSpacing = 150;
-  const layerHeight = 120;
+  const layerHeight = 180;
   const ringRadius = roots.length <= 1
     ? 0
     : (roots.length * minSpacing) / (2 * Math.PI);
@@ -494,13 +494,192 @@ function computeOptimalRootOrder(roots, graphUri, ringCenter, allRingCenters, no
     }
   }
 
-  // Unconstrained roots fill remaining slots
-  const unconstrainedRoots = unconstrained.map(u => u.root);
-  let uIdx = 0;
-  for (let s = 0; s < N && uIdx < unconstrainedRoots.length; s++) {
-    if (!slotContents[s]) {
-      slotContents[s] = unconstrainedRoots[uIdx++];
+  // ── Crossing minimization for unconstrained roots ──
+  // Collect all intra-ring edges as pairs of root URIs.
+  // Also include cross-ring edges modeled as root → "virtual slot" at idealAngle.
+  // An intra-ring edge (rootA, rootB) means rootA's subtree connects to rootB's subtree.
+
+  // Build edge list: [slotA, slotB] pairs (will be recomputed per permutation)
+  const intraEdges = []; // { rootA_uri, rootB_uri }
+  for (const [key, count] of Object.entries(intraAffinity)) {
+    if (count > 0) {
+      const [a, b] = key.split('\0');
+      intraEdges.push({ a, b });
     }
+  }
+
+  // Cross-ring edges: each constrained root has an idealAngle pointing outside.
+  // Model as an edge from the root's slot to a virtual point at idealAngle.
+  // Two cross-ring edges cross if their slot positions and ideal angles interleave.
+  const crossRingEdges = []; // { rootUri, idealAngle }
+  for (const c of constrained) {
+    crossRingEdges.push({ rootUri: c.root.uri, idealAngle: c.idealAngle });
+  }
+
+  // Count crossings for a given slot assignment
+  function countCrossings(slots) {
+    // Build uri -> slot index map
+    const uriToSlot = {};
+    for (let s = 0; s < N; s++) {
+      if (slots[s]) uriToSlot[slots[s].uri] = s;
+    }
+
+    let crossings = 0;
+
+    // Check intra-ring edge crossings: two edges (a,b) and (c,d) on a circle
+    // cross iff exactly one of {c,d} is strictly inside the arc from a to b.
+    function isBetween(x, a, b) {
+      // Is x strictly between a and b going clockwise on circle of N slots?
+      if (a === b) return false;
+      if (a < b) return x > a && x < b;
+      return x > a || x < b; // wraps around
+    }
+
+    for (let i = 0; i < intraEdges.length; i++) {
+      const sa = uriToSlot[intraEdges[i].a];
+      const sb = uriToSlot[intraEdges[i].b];
+      if (sa === undefined || sb === undefined) continue;
+      for (let j = i + 1; j < intraEdges.length; j++) {
+        const sc = uriToSlot[intraEdges[j].a];
+        const sd = uriToSlot[intraEdges[j].b];
+        if (sc === undefined || sd === undefined) continue;
+        const cInAB = isBetween(sc, sa, sb);
+        const dInAB = isBetween(sd, sa, sb);
+        if (cInAB !== dInAB) crossings++;
+      }
+    }
+
+    // Check cross-ring edge crossings against each other
+    // Model: edge from slot position to idealAngle (external point far away)
+    // Two such edges cross if the slot order and ideal angle order disagree
+    for (let i = 0; i < crossRingEdges.length; i++) {
+      const slotI = uriToSlot[crossRingEdges[i].rootUri];
+      if (slotI === undefined) continue;
+      const angleI = crossRingEdges[i].idealAngle;
+      for (let j = i + 1; j < crossRingEdges.length; j++) {
+        const slotJ = uriToSlot[crossRingEdges[j].rootUri];
+        if (slotJ === undefined) continue;
+        const angleJ = crossRingEdges[j].idealAngle;
+        // Edges cross if the slot ordering doesn't match the angle ordering
+        // (one is clockwise of the other by slot, but counterclockwise by angle)
+        const slotDiff = ((slotJ - slotI) % N + N) % N;
+        const angleDiff = ((angleJ - angleI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        const slotCW = slotDiff < N / 2;
+        const angleCW = angleDiff < Math.PI;
+        if (slotCW !== angleCW) crossings++;
+      }
+    }
+
+    // Check intra-ring edges crossing cross-ring edges
+    // Cross-ring edge goes from slot to external point at idealAngle.
+    // Intra-ring edge goes from slotA to slotB (both on ring).
+    // They cross if the external point's angle is "between" slotA and slotB angles
+    // AND the cross-ring root's slot is NOT between slotA and slotB.
+    for (const intra of intraEdges) {
+      const sa = uriToSlot[intra.a];
+      const sb = uriToSlot[intra.b];
+      if (sa === undefined || sb === undefined) continue;
+      const angleA = slotAngles[sa];
+      const angleB = slotAngles[sb];
+      for (const cross of crossRingEdges) {
+        const sc = uriToSlot[cross.rootUri];
+        if (sc === undefined) continue;
+        // Does the external line from slot sc to idealAngle cross the chord from sa to sb?
+        // Simplified: check if sc is on one side of the chord and idealAngle is on the other
+        function angleIsBetween(angle, a1, a2) {
+          const norm = (x) => ((x % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+          const na = norm(angle - a1);
+          const nb = norm(a2 - a1);
+          return nb > 0 && na > 0 && na < nb;
+        }
+        const scAngle = slotAngles[sc];
+        const crossBetween = angleIsBetween(scAngle, angleA, angleB) || angleIsBetween(scAngle, angleB, angleA);
+        const idealBetween = angleIsBetween(cross.idealAngle, angleA, angleB) || angleIsBetween(cross.idealAngle, angleB, angleA);
+        // They cross if the slot and ideal point are on opposite sides of the chord
+        if (crossBetween !== idealBetween && sc !== sa && sc !== sb) crossings++;
+      }
+    }
+
+    return crossings;
+  }
+
+  // Find which slots are free (not claimed by constrained roots)
+  const freeSlots = [];
+  for (let s = 0; s < N; s++) {
+    if (!slotContents[s]) freeSlots.push(s);
+  }
+
+  const unconstrainedRoots = unconstrained.map(u => u.root);
+  const K = unconstrainedRoots.length;
+
+  if (K === 0) {
+    // No unconstrained roots — nothing to optimize
+  } else if (K <= 8) {
+    // Enumerate all permutations, pick the one with fewest crossings
+    let bestPerm = null;
+    let bestCrossings = Infinity;
+
+    function permute(arr, l, r) {
+      if (l === r) {
+        // Apply this permutation to slotContents
+        for (let i = 0; i < K; i++) {
+          slotContents[freeSlots[i]] = arr[i];
+        }
+        const c = countCrossings(slotContents);
+        if (c < bestCrossings) {
+          bestCrossings = c;
+          bestPerm = [...arr];
+        }
+        return;
+      }
+      for (let i = l; i <= r; i++) {
+        [arr[l], arr[i]] = [arr[i], arr[l]];
+        permute(arr, l + 1, r);
+        [arr[l], arr[i]] = [arr[i], arr[l]];
+      }
+    }
+
+    permute([...unconstrainedRoots], 0, K - 1);
+
+    // Apply best permutation
+    if (bestPerm) {
+      for (let i = 0; i < K; i++) {
+        slotContents[freeSlots[i]] = bestPerm[i];
+      }
+      console.log(`[angular] ring="${graphUri}": exhaustive search of ${K}! = ${[...Array(K)].reduce((a,_,i) => a*(i+1), 1)} permutations, best crossings = ${bestCrossings}`);
+    }
+  } else {
+    // Greedy swap hill-climbing for larger K
+    // Start with arbitrary assignment
+    for (let i = 0; i < K; i++) {
+      slotContents[freeSlots[i]] = unconstrainedRoots[i];
+    }
+
+    let currentCrossings = countCrossings(slotContents);
+    const maxIter = 1000;
+    let improved = true;
+    let iter = 0;
+
+    while (improved && iter < maxIter) {
+      improved = false;
+      iter++;
+      for (let i = 0; i < K; i++) {
+        for (let j = i + 1; j < K; j++) {
+          // Try swapping unconstrained roots at freeSlots[i] and freeSlots[j]
+          const si = freeSlots[i], sj = freeSlots[j];
+          [slotContents[si], slotContents[sj]] = [slotContents[sj], slotContents[si]];
+          const newCrossings = countCrossings(slotContents);
+          if (newCrossings < currentCrossings) {
+            currentCrossings = newCrossings;
+            improved = true;
+          } else {
+            // Swap back
+            [slotContents[si], slotContents[sj]] = [slotContents[sj], slotContents[si]];
+          }
+        }
+      }
+    }
+    console.log(`[angular] ring="${graphUri}": greedy swap (${K} unconstrained), ${iter} iterations, crossings = ${currentCrossings}`);
   }
 
   // Build ordered list from slots

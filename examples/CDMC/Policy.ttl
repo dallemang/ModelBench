@@ -1,0 +1,322 @@
+# imports: https://spec.edmcouncil.org/cdmc/ontology/Control
+# imports: https://spec.edmcouncil.org/cdmc/ontology/Core
+# imports: https://spec.edmcouncil.org/cdmc/ontology/DataUse
+
+@prefix cdmc-core: <https://spec.edmcouncil.org/cdmc/ontology/Core/> .
+@prefix cdmc-policy: <https://spec.edmcouncil.org/cdmc/ontology/Policy/> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sm: <http://www.omg.org/techprocess/ab/SpecificationMetadata/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://spec.edmcouncil.org/cdmc/ontology/Policy>
+	a owl:Ontology ;
+	dct:abstract "This ontology defines terms relevant to specifying data management policies, including rules, obligatinos permissions and privacy. " ;
+	dct:license "https://opensource.org/licenses/MIT"^^xsd:AnyURI ;
+	sm:copyright "Copyright (c) 2022 EDM Council, Inc." ;
+	owl:imports
+		<https://spec.edmcouncil.org/cdmc/ontology/Control> ,
+		<https://spec.edmcouncil.org/cdmc/ontology/Core> ,
+		<https://spec.edmcouncil.org/cdmc/ontology/DataUse>
+		;
+	owl:versionInfo "Created with TopBraid Composer" ;
+	<http://www.w3.org/2004/02/skos/core#scopeNote> "If the Prohibition has been infringed by the action being exercised, then all of the remedies MUST be fulfilled to set the state of the Prohibition to not infringed." ;
+	.
+
+cdmc-policy:Constraint
+	a owl:Class ;
+	rdfs:subClassOf owl:Thing ;
+	rdfs:label "Constraint" ;
+	dc:source <http://www.w3.org/ns/odrl/2/> ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "expression that compares two operands (which are not Constraints) by one relational operator. If the comparison returns a match the Constraint is satisfied, otherwise it is not satisfied" ;
+	.
+
+cdmc-policy:Duty
+	a owl:Class ;
+	rdfs:subClassOf cdmc-policy:Rule ;
+	rdfs:label "Duty" ;
+	dc:source <http://www.w3.org/ns/odrl/2/> ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	rdfs:seeAlso "" ;
+	<http://www.w3.org/2004/02/skos/core#definition> "obligation to exercise an action, with all refinements satisfied. A Duty is fulfilled if all constraints are satisfied and if its action, with all refinements satisfied, has been exercised" ;
+	.
+
+cdmc-policy:Jurisdiction
+	a owl:Class ;
+	rdfs:subClassOf owl:Thing ;
+	rdfs:label "Jurisdiction" ;
+	dc:source <http://purl.org/dc/terms/> ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	rdfs:seeAlso dct:Jurisdiction ;
+	<http://www.w3.org/2004/02/skos/core#definition> "extent or range of judicial, law enforcement, or other authority" ;
+	.
+
+cdmc-policy:LifecyclePolicy
+	a owl:Class ;
+	rdfs:subClassOf cdmc-policy:Policy ;
+	rdfs:label "Lifecycle Policy" ;
+	dc:source "CDMC" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "policy governing the lifecycle of data" ;
+	.
+
+cdmc-policy:Permission
+	a owl:Class ;
+	rdfs:subClassOf cdmc-policy:Rule ;
+	rdfs:label "Permission" ;
+	dc:source <http://www.w3.org/ns/odrl/2/> ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	rdfs:seeAlso <http://www.w3.org/ns/odrl/2/Permission> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "rule that allows an action, with all refinements satisfied, to be exercised on an Asset if all constraints are satisfied and if all duties are fulfilled" ;
+	.
+
+cdmc-policy:Policy
+	a owl:Class ;
+	rdfs:subClassOf
+		owl:Thing ,
+		_:blank2 ,
+		_:blank3 ,
+		_:blank4
+		;
+	rdfs:label "Policy" ;
+	dc:source "DCAM" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	rdfs:seeAlso "" ;
+	<http://www.w3.org/2004/02/skos/core#definition> "high level directive that expresses goals and represents management expectations for legal, regulatory and/or organizational requirements" ;
+	.
+
+cdmc-policy:PrivacyPolicy
+	a owl:Class ;
+	rdfs:subClassOf cdmc-policy:Policy ;
+	rdfs:label "Privacy Policy" ;
+	dc:source "CDMC" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "policy governing the privacy of data" ;
+	.
+
+cdmc-policy:Prohibition
+	a owl:Class ;
+	rdfs:subClassOf cdmc-policy:Rule ;
+	rdfs:label "Prohibition" ;
+	dc:source <http://www.w3.org/ns/odrl/2/> ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "rule that disallows an action, with all refinements satisfied, to be exercised on an Asset if all constraints are satisfied" ;
+	.
+
+cdmc-policy:Regulation
+	a owl:Class ;
+	rdfs:subClassOf
+		owl:Thing ,
+		_:blank6 ,
+		_:blank8
+		;
+	rdfs:label "Regulation" ;
+	dc:source "CDMC" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "rule or directive made and maintained by an authority" ;
+	.
+
+cdmc-policy:RiskPolicy
+	a owl:Class ;
+	rdfs:subClassOf cdmc-policy:Policy ;
+	rdfs:label "Risk Policy" ;
+	dc:source "CDMC" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "policy governing risk of data" ;
+	.
+
+cdmc-policy:Rule
+	a owl:Class ;
+	rdfs:subClassOf
+		owl:Thing ,
+		_:blank1 ,
+		_:blank5
+		;
+	rdfs:label "Rule" ;
+	dc:source <http://www.w3.org/ns/odrl/2/> ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "permission, prohibition or duty. The Rule class represents the common characteristics of these three classes. A Rule class MUST be disjoint with all other Rule subclasses" ;
+	.
+
+cdmc-policy:SecurityPolicy
+	a owl:Class ;
+	rdfs:subClassOf cdmc-policy:Policy ;
+	rdfs:label "Security Policy" ;
+	dc:source "CDMC" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "policy governing the security of data" ;
+	.
+
+cdmc-policy:Standard
+	a owl:Class ;
+	rdfs:subClassOf
+		owl:Thing ,
+		_:blank7
+		;
+	rdfs:label "Standard" ;
+	dc:source "DCAM" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "rule or set of rules that defines expected actions for achieving compliance to associated policies" ;
+	.
+
+cdmc-policy:appliesContraint
+	a owl:ObjectProperty ;
+	rdfs:label "applies contraint" ;
+	dc:source "CDMC" ;
+	rdfs:domain cdmc-policy:Rule ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	rdfs:range cdmc-policy:Constraint ;
+	rdfs:seeAlso <http://www.w3.org/ns/odrl/2/constraint> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "specifies a Constraint that is enforced by a Rule" ;
+	.
+
+cdmc-policy:coversJusrisdiction
+	a owl:ObjectProperty ;
+	rdfs:label "covers jusrisdiction" ;
+	dc:source "CDMC" ;
+	rdfs:domain cdmc-core:Resource ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Core> ;
+	rdfs:range cdmc-policy:Jurisdiction ;
+	<http://www.w3.org/2004/02/skos/core#definition> "identifies a Jusrisdiction that applies to a Resource" ;
+	.
+
+cdmc-policy:creates
+	a owl:ObjectProperty ;
+	rdfs:label "creates" ;
+	dc:source "CDMC" ;
+	rdfs:domain cdmc-policy:Rule ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	rdfs:range cdmc-core:Resource ;
+	<http://www.w3.org/2004/02/skos/core#definition> "identifies a Resource that is created by a Rule" ;
+	.
+
+cdmc-policy:generates
+	a owl:ObjectProperty ;
+	rdfs:label "generates" ;
+	dc:source "CDMC" ;
+	rdfs:domain <https://spec.edmcouncil.org/cdmc/ontology/DataUse/DataSharingAgreement> ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:range cdmc-policy:Policy ;
+	<http://www.w3.org/2004/02/skos/core#definition> "identifies a Policy created or modified by a Data Sharing Agreement" ;
+	.
+
+cdmc-policy:hasAssignee
+	a owl:ObjectProperty ;
+	rdfs:label "has assignee" ;
+	dc:source "CDMC" ;
+	rdfs:domain cdmc-policy:Rule ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	rdfs:range cdmc-core:Agent ;
+	rdfs:seeAlso <http://www.w3.org/ns/odrl/2/assignee> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "specifies an Agent who receives the details of a Rule" ;
+	.
+
+cdmc-policy:hasAssignor
+	a owl:ObjectProperty ;
+	rdfs:label "has assignor" ;
+	dc:source "CDMC" ;
+	rdfs:domain cdmc-policy:Rule ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	rdfs:range cdmc-core:Agent ;
+	rdfs:seeAlso <http://www.w3.org/ns/odrl/2/assignor> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "specifies the Agent who describes a Rule" ;
+	.
+
+cdmc-policy:hasPolicy
+	a owl:ObjectProperty ;
+	rdfs:label "has policy" ;
+	dc:source "CDMC" ;
+	rdfs:domain cdmc-core:Resource ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Core> ;
+	rdfs:range cdmc-policy:Policy ;
+	<http://www.w3.org/2004/02/skos/core#definition> "specifies that a Policy applies to a Resource" ;
+	.
+
+cdmc-policy:hasReach
+	a owl:ObjectProperty ;
+	rdfs:label "has reach" ;
+	rdfs:domain cdmc-policy:Jurisdiction ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	rdfs:range cdmc-core:Location ;
+	rdfs:seeAlso <https://spec.edmcouncil.org/fibo/ontology/FND/Law/Jurisdiction/hasReach> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "indicates the geopolitical area covered by a Jurisdiction" ;
+	.
+
+cdmc-policy:influences
+	a owl:ObjectProperty ;
+	rdfs:label "influences" ;
+	dc:source "CDMC" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "indicates something else that is impacted by the nature of something" ;
+	.
+
+cdmc-policy:instantiates
+	a owl:ObjectProperty ;
+	rdfs:label "instantiates" ;
+	rdfs:domain <https://spec.edmcouncil.org/cdmc/ontology/DataUse/Entitlement> ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:range cdmc-policy:Rule ;
+	<http://www.w3.org/2004/02/skos/core#definition> "specifies a Rule that brings an Entitlement into effect" ;
+	.
+
+cdmc-policy:specifies
+	a owl:ObjectProperty ;
+	rdfs:label "specifies" ;
+	rdfs:domain cdmc-policy:Policy ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Policy> ;
+	rdfs:range <https://spec.edmcouncil.org/cdmc/ontology/Control/Control> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "identifies a Control that is required by a Policy" ;
+	.
+
+_:blank1
+	a owl:Restriction ;
+	owl:onProperty cdmc-core:appliesTo ;
+	owl:someValuesFrom cdmc-core:Resource ;
+	.
+
+_:blank2
+	a owl:Restriction ;
+	owl:onProperty cdmc-core:contains ;
+	owl:someValuesFrom cdmc-policy:Duty ;
+	.
+
+_:blank3
+	a owl:Restriction ;
+	owl:onProperty cdmc-core:contains ;
+	owl:someValuesFrom cdmc-policy:Permission ;
+	.
+
+_:blank4
+	a owl:Restriction ;
+	owl:onProperty cdmc-core:contains ;
+	owl:someValuesFrom cdmc-policy:Prohibition ;
+	.
+
+_:blank5
+	a owl:Restriction ;
+	owl:onProperty cdmc-core:hasExercisableAction ;
+	owl:someValuesFrom <https://spec.edmcouncil.org/cdmc/ontology/DataUse/Action> ;
+	.
+
+_:blank6
+	a owl:Restriction ;
+	owl:onProperty cdmc-core:references ;
+	owl:someValuesFrom cdmc-policy:Jurisdiction ;
+	.
+
+_:blank7
+	a owl:Restriction ;
+	owl:onProperty cdmc-policy:influences ;
+	owl:someValuesFrom cdmc-policy:Policy ;
+	.
+
+_:blank8
+	a owl:Restriction ;
+	owl:onProperty cdmc-policy:influences ;
+	owl:someValuesFrom cdmc-policy:Standard ;
+	.
+

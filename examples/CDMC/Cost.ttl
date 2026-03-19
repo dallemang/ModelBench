@@ -1,0 +1,102 @@
+# imports: https://spec.edmcouncil.org/cdmc/ontology/Core
+# imports: https://spec.edmcouncil.org/cdmc/ontology/Lineage
+
+@prefix cdmc-core: <https://spec.edmcouncil.org/cdmc/ontology/Core/> .
+@prefix cdmc-cost: <https://spec.edmcouncil.org/cdmc/ontology/Cost/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sm: <http://www.omg.org/techprocess/ab/SpecificationMetadata/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://spec.edmcouncil.org/cdmc/ontology/Cost>
+	a owl:Ontology ;
+	dct:abstract "This ontology defines notions for determining costs of various cloud data management functions. " ;
+	dct:license "https://opensource.org/licenses/MIT"^^xsd:AnyURI ;
+	sm:copyright "Copyright (c) 2022 EDM Council, Inc." ;
+	owl:imports
+		<https://spec.edmcouncil.org/cdmc/ontology/Core> ,
+		<https://spec.edmcouncil.org/cdmc/ontology/Lineage>
+		;
+	owl:versionInfo "Created with TopBraid Composer" ;
+	.
+
+cdmc-cost:ComputeCost
+	a owl:Class ;
+	rdfs:subClassOf cdmc-cost:Cost ;
+	rdfs:label "Compute Cost" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Cost> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "cost associated with processing data" ;
+	.
+
+cdmc-cost:Cost
+	a owl:Class ;
+	rdfs:subClassOf cdmc-core:Metric ;
+	rdfs:label "Cost" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Cost> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "amount that has to be paid or spent to buy or obtain something" ;
+	.
+
+cdmc-cost:EgressCost
+	a owl:Class ;
+	rdfs:subClassOf cdmc-cost:Cost ;
+	rdfs:label "Egress Cost" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Cost> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "cost associated with data leaving a cloud defined perimeter, such as a network or storage device" ;
+	.
+
+cdmc-cost:IngressCost
+	a owl:Class ;
+	rdfs:subClassOf cdmc-cost:Cost ;
+	rdfs:label "Ingress Cost" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Cost> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "cost associated with data entering a cloud defined perimeter, such as a network or storage device" ;
+	.
+
+cdmc-cost:NetworkCost
+	a owl:Class ;
+	rdfs:subClassOf cdmc-cost:Cost ;
+	rdfs:label "Network Cost" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Cost> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "cost associated with data being transmitted through or within a cloud based network" ;
+	.
+
+cdmc-cost:StorageCost
+	a owl:Class ;
+	rdfs:subClassOf cdmc-cost:Cost ;
+	rdfs:label "Storage Cost" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Cost> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "cost associated with storing data in a cloud defined storage device, which may be at rest or in motion" ;
+	.
+
+cdmc-cost:incurs
+	a owl:ObjectProperty ;
+	rdfs:label "incurs" ;
+	rdfs:comment "The acquisition of a liability" ;
+	rdfs:domain _:blank4 ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/Core> ;
+	rdfs:range cdmc-cost:Cost ;
+	<http://www.w3.org/2004/02/skos/core#definition> "specifies the Cost that is incurred by something" ;
+	.
+
+_:blank1
+	rdf:first cdmc-core:DataService ;
+	rdf:rest rdf:nil ;
+	.
+
+_:blank2
+	rdf:first cdmc-core:DatabaseStorage ;
+	rdf:rest _:blank1 ;
+	.
+
+_:blank3
+	rdf:first <https://spec.edmcouncil.org/cdmc/ontology/Lineage/Activity> ;
+	rdf:rest _:blank2 ;
+	.
+
+_:blank4
+	a owl:Class ;
+	owl:unionOf _:blank3 ;
+	.
+

@@ -1,0 +1,182 @@
+# imports: https://spec.edmcouncil.org/cdmc/ontology/Core
+
+@prefix cdmc-core: <https://spec.edmcouncil.org/cdmc/ontology/Core/> .
+@prefix cdmc-du: <https://spec.edmcouncil.org/cdmc/ontology/DataUse/> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+@prefix dct: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sm: <http://www.omg.org/techprocess/ab/SpecificationMetadata/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://spec.edmcouncil.org/cdmc/ontology/DataUse>
+	a owl:Ontology ;
+	dct:abstract "This ontology defines strucutre around how data is used and howt hat use is specifed. " ;
+	dct:license "https://opensource.org/licenses/MIT"^^xsd:AnyURI ;
+	sm:copyright "Copyright (c) 2022 EDM Council, Inc." ;
+	owl:imports <https://spec.edmcouncil.org/cdmc/ontology/Core> ;
+	owl:versionInfo "Created with TopBraid Composer" ;
+	.
+
+cdmc-du:Action
+	a owl:Class ;
+	rdfs:subClassOf owl:Thing ;
+	rdfs:label "Action" ;
+	dc:source <http://www.w3.org/ns/odrl/2/> ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:seeAlso "egeria:Data Processing Action" ;
+	<http://www.w3.org/2004/02/skos/core#definition> "operation that can be exercised on an Asset. An Action is associated with the Asset via the action property in a Rule" ;
+	.
+
+cdmc-du:DataSharingAgreement
+	a owl:Class ;
+	rdfs:subClassOf owl:Thing ;
+	rdfs:label "Data Sharing Agreement" ;
+	dc:source "DCAM" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "agreement that sets out a common set of rules between the data producer and data consumer that establishes terms and restrictions of the use of consumed data" ;
+	.
+
+cdmc-du:Entitlement
+	a owl:Class ;
+	rdfs:subClassOf
+		owl:Thing ,
+		_:blank1 ,
+		_:blank2
+		;
+	rdfs:label "Entitlement" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "status granted to a person or group of persons representing their permission to access a specific data asset or any data asset with specific scope and characteristics" ;
+	.
+
+cdmc-du:Purpose
+	a owl:Class ;
+	rdfs:subClassOf owl:Thing ;
+	rdfs:label "Purpose" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:seeAlso "egeria:Data Processing Purpose" ;
+	<http://www.w3.org/2004/02/skos/core#definition> "reason for which an action is performed" ;
+	.
+
+cdmc-du:ServiceLevelAgreement
+	a owl:Class ;
+	rdfs:subClassOf
+		owl:Thing ,
+		_:blank3
+		;
+	rdfs:label "Service Level Agreement" ;
+	dc:source "CDMC Training Materials" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "overall agreement with a provider on what is provided, how it is supported, times, locations, costs, performance, responsibilities, etc" ;
+	.
+
+cdmc-du:ServiceLevelObjective
+	a owl:Class ;
+	rdfs:subClassOf owl:Thing ;
+	rdfs:label "Service Level Objective" ;
+	dc:source "CDMC Training Materials" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	<http://www.w3.org/2004/02/skos/core#definition> "component of the SLA covering measurable (quantifiable) aspects of the agreement to objectively monitor performance of the provider against the overall agreement" ;
+	.
+
+cdmc-du:Usage
+	a owl:Class ;
+	rdfs:subClassOf
+		owl:Thing ,
+		_:blank4
+		;
+	rdfs:label "Usage" ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:seeAlso "egeria:Data Processing Description" ;
+	<http://www.w3.org/2004/02/skos/core#definition> "use of a Data Asset by an Agent via a Data Service for one or more specified Purposes" ;
+	.
+
+cdmc-du:applicableIn
+	a owl:ObjectProperty ;
+	rdfs:label "applicable in" ;
+	rdfs:domain cdmc-du:Entitlement ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:range cdmc-core:Location ;
+	<http://www.w3.org/2004/02/skos/core#definition> "specifies a geographic Location in which an Entitlement applies" ;
+	.
+
+cdmc-du:authorizes
+	a owl:ObjectProperty ;
+	rdfs:label "authorizes" ;
+	rdfs:domain cdmc-du:Entitlement ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:range cdmc-core:Agent ;
+	<http://www.w3.org/2004/02/skos/core#definition> "specifies an Agent that an Entitlement authorizes" ;
+	.
+
+cdmc-du:constrains
+	a owl:ObjectProperty ;
+	rdfs:label "constrains" ;
+	rdfs:domain cdmc-du:DataSharingAgreement ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:range cdmc-du:Purpose ;
+	<http://www.w3.org/2004/02/skos/core#definition> "indicates that something acts as a constraint upon something else" ;
+	.
+
+cdmc-du:exercisedAction
+	a owl:ObjectProperty ;
+	rdfs:label "exercised action" ;
+	rdfs:domain cdmc-du:Usage ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:range cdmc-du:Action ;
+	<http://www.w3.org/2004/02/skos/core#definition> "identifies an Action that was taken as part of a Usage" ;
+	.
+
+cdmc-du:hasServiceLevelAgreement
+	a owl:ObjectProperty ;
+	rdfs:label "has service level agreement" ;
+	dc:source "CDMC" ;
+	rdfs:domain cdmc-du:DataSharingAgreement ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:range cdmc-du:ServiceLevelAgreement ;
+	<http://www.w3.org/2004/02/skos/core#definition> "identifies a Service Level Agreement that is includes as part of a Data Sharing Agreement." ;
+	.
+
+cdmc-du:usedBy
+	a owl:ObjectProperty ;
+	rdfs:label "used by" ;
+	rdfs:domain cdmc-du:Usage ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:range cdmc-core:Agent ;
+	<http://www.w3.org/2004/02/skos/core#definition> "identifies an Agent associated with a Usage" ;
+	.
+
+cdmc-du:usedFor
+	a owl:ObjectProperty ;
+	rdfs:label "used for" ;
+	rdfs:domain cdmc-du:Usage ;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/cdmc/ontology/DataUse> ;
+	rdfs:range cdmc-du:Purpose ;
+	<http://www.w3.org/2004/02/skos/core#definition> "identifies a Purpose associated with a Usage" ;
+	.
+
+_:blank1
+	a owl:Restriction ;
+	owl:onProperty cdmc-core:hasExercisableAction ;
+	owl:allValuesFrom cdmc-du:Action ;
+	.
+
+_:blank2
+	a owl:Restriction ;
+	owl:onProperty cdmc-core:appliesTo ;
+	owl:someValuesFrom cdmc-core:DataService ;
+	.
+
+_:blank3
+	a owl:Restriction ;
+	owl:onProperty cdmc-core:contains ;
+	owl:someValuesFrom cdmc-du:ServiceLevelObjective ;
+	.
+
+_:blank4
+	a owl:Restriction ;
+	owl:onProperty cdmc-core:describes ;
+	owl:someValuesFrom cdmc-core:DataService ;
+	.
+

@@ -372,114 +372,69 @@ function computeOptimalRootOrder(roots, graphUri, ringCenter, allRingCenters, no
     return intraAffinity[key] || 0;
   }
 
-  // ── Angle-based ordering with greedy affinity placement ──
-  // Constrained roots get their ideal angles as sort keys.
-  // Unconstrained roots with intra-ring affinity get angles nudged
-  // right next to their strongest connection (epsilon offset ensures adjacency).
-  // Isolated roots go in the largest gap.
-  // Final layout is EVENLY SPACED — angles only determine ORDER.
+  // ── Slot assignment: constrained roots first, then fill ──
+  // N evenly-spaced slots on a clock face, slot 0 at top (-π/2).
+  // Constrained roots claim nearest available slot (strongest first).
+  // Unconstrained roots fill whatever slots remain.
 
-  const placed = new Map(); // rootUri -> sortAngle
-  for (const c of constrained) {
-    placed.set(c.root.uri, c.idealAngle);
+  const N = roots.length;
+  const angleStep = (2 * Math.PI) / N;
+  const startAngle = -(Math.PI / 2);
+
+  // Slot angles: fixed clock face
+  const slotAngles = [];
+  for (let s = 0; s < N; s++) {
+    slotAngles.push(startAngle + s * angleStep);
   }
 
-  function findLargestGapMidpoint() {
-    const angles = [...placed.values()].sort((a, b) => a - b);
-    if (angles.length === 0) return 0;
-    if (angles.length === 1) return angles[0] + Math.PI;
-    let maxGap = 0, maxMid = 0;
-    for (let i = 0; i < angles.length; i++) {
-      const next = (i + 1) % angles.length;
-      let gap = angles[next] - angles[i];
-      if (gap <= 0) gap += 2 * Math.PI;
-      if (gap > maxGap) {
-        maxGap = gap;
-        maxMid = angles[i] + gap / 2;
-      }
-    }
-    return maxMid;
+  // Helper: angular distance (unsigned, 0 to π)
+  function angDist(a, b) {
+    let d = Math.abs(a - b) % (2 * Math.PI);
+    if (d > Math.PI) d = 2 * Math.PI - d;
+    return d;
   }
 
-  const allAssigned = constrained.map(c => ({ root: c.root, angle: c.idealAngle, constrained: true }));
-  const remaining = unconstrained.map(u => u.root);
+  const slotContents = new Array(N).fill(null);
 
-  // Tiny epsilon to ensure affinity roots sort right after their connection
-  const eps = 0.0001;
-
-  while (remaining.length > 0) {
-    let bestIdx = 0;
-    let bestStrength = -1;
-    let bestAngle = null;
-    let bestNeighborUri = null;
-
-    for (let i = 0; i < remaining.length; i++) {
-      const root = remaining[i];
-      let maxW = 0, maxNeighborUri = null;
-
-      for (const [placedUri, placedAngle] of placed) {
-        const w = getAffinity(root.uri, placedUri);
-        if (w > maxW) {
-          maxW = w;
-          maxNeighborUri = placedUri;
-        }
-      }
-
-      if (maxW > bestStrength) {
-        bestStrength = maxW;
-        bestIdx = i;
-        bestNeighborUri = maxNeighborUri;
-        bestAngle = maxW > 0 ? placed.get(maxNeighborUri) + eps : null;
-      }
-    }
-
-    const root = remaining[bestIdx];
-    remaining.splice(bestIdx, 1);
-
-    if (bestAngle === null) {
-      bestAngle = findLargestGapMidpoint();
-    }
-
-    placed.set(root.uri, bestAngle);
-    allAssigned.push({ root, angle: bestAngle, constrained: false });
-    if (bestStrength > 0) {
-      console.log(`[angular] placed "${root.label}" next to "${roots.find(r => r.uri === bestNeighborUri)?.label}" (affinity=${bestStrength})`);
-    } else {
-      console.log(`[angular] placed isolated "${root.label}" in largest gap`);
-    }
-  }
-
-  // Sort all roots by their assigned angle (determines ORDER only)
-  allAssigned.sort((a, b) => a.angle - b.angle);
-
-  const ordered = allAssigned.map(a => a.root);
-
-  // Compute startAngle from constrained roots' positions in the sorted order
-  const angleStep = (2 * Math.PI) / ordered.length;
-  const constrainedPositions = [];
-  allAssigned.forEach((a, idx) => {
-    if (a.constrained) {
-      constrainedPositions.push({ index: idx, idealAngle: a.angle });
-    }
+  // Constrained roots claim slots — strongest-connected get first pick
+  const ranked = [...constrained].sort((a, b) => {
+    const wa = Object.values(subtreeNeighborWeights(a.root)).reduce((s, w) => s + w, 0);
+    const wb = Object.values(subtreeNeighborWeights(b.root)).reduce((s, w) => s + w, 0);
+    return wb - wa;
   });
 
-  let sumOffset = 0;
-  for (const { index, idealAngle } of constrainedPositions) {
-    let offset = idealAngle - index * angleStep;
-    offset = ((offset + Math.PI) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) - Math.PI;
-    sumOffset += offset;
+  for (const c of ranked) {
+    let bestSlot = -1, bestDist = Infinity;
+    for (let s = 0; s < N; s++) {
+      if (slotContents[s]) continue;
+      const dist = angDist(slotAngles[s], c.idealAngle);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestSlot = s;
+      }
+    }
+    if (bestSlot >= 0) {
+      slotContents[bestSlot] = c.root;
+      console.log(`[angular] "${c.root.label}" → slot ${bestSlot} at ${(slotAngles[bestSlot] * 180 / Math.PI).toFixed(0)}° (ideal=${(c.idealAngle * 180 / Math.PI).toFixed(0)}°, err=${(bestDist * 180 / Math.PI).toFixed(0)}°)`);
+    }
   }
-  const startAngle = sumOffset / constrainedPositions.length;
 
-  // Diagnostic
-  console.log(`[angular] ring="${graphUri}" startAngle=${(startAngle * 180 / Math.PI).toFixed(1)}°`);
-  console.log(`[angular] ring="${graphUri}" order: ${ordered.map(r => r.label).join(' → ')}`);
-  for (const { index, idealAngle } of constrainedPositions) {
-    const actualAngle = startAngle + index * angleStep;
-    const root = ordered[index];
-    const error = idealAngle - actualAngle;
-    console.log(`[angular]   "${root.label}" pos=${index}/${ordered.length} ideal=${(idealAngle * 180 / Math.PI).toFixed(1)}° actual=${(actualAngle * 180 / Math.PI).toFixed(1)}° error=${(error * 180 / Math.PI).toFixed(1)}°`);
+  // Unconstrained roots fill remaining slots
+  const unconstrainedRoots = unconstrained.map(u => u.root);
+  let uIdx = 0;
+  for (let s = 0; s < N && uIdx < unconstrainedRoots.length; s++) {
+    if (!slotContents[s]) {
+      slotContents[s] = unconstrainedRoots[uIdx++];
+    }
   }
+
+  // Build ordered list from slots
+  const ordered = [];
+  for (let s = 0; s < N; s++) {
+    if (slotContents[s]) ordered.push(slotContents[s]);
+  }
+
+  console.log(`[angular] ring="${graphUri}" order: ${ordered.map(r => r.label).join(' → ')}`);
 
   return { orderedRoots: ordered, startAngle };
 }

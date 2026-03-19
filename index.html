@@ -269,6 +269,39 @@
         height: 100%;
         display: flex;
         flex-direction: column;
+        position: relative;
+      }
+      #diagram-legend {
+        position: absolute;
+        top: 45px;
+        left: 8px;
+        z-index: 10;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 6px 10px;
+        font-size: 12px;
+        max-height: 40%;
+        overflow-y: auto;
+        display: none;
+      }
+      #diagram-legend .legend-item {
+        display: flex;
+        align-items: center;
+        margin: 3px 0;
+      }
+      #diagram-legend .legend-swatch {
+        width: 24px;
+        height: 12px;
+        border-radius: 2px;
+        margin-right: 6px;
+        flex-shrink: 0;
+        border: 1px solid rgba(0,0,0,0.2);
+      }
+      #diagram-legend .legend-label {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       #diagram-toolbar {
         padding: 10px;
@@ -704,12 +737,14 @@
                   <option value="traditional">Single Ring</option>
                   <option value="topdown">Top-Down</option>
                 </select>
+                <button onclick="toggleDarkMode()">Dark Mode</button>
                 <button onclick="debugDiagramData()">Debug Data</button>
               </div>
+              <div id="diagram-legend"></div>
               <div id="cytoscape-container"></div>
             </div>
           </div>
-          
+
           <!-- SPARQL Query Tab -->
           <div id="tab-query" class="tab-pane">
             <div class="split-panel">

@@ -8,6 +8,13 @@ import { buildCytoscapeDataWithRings } from './cytoscape-ring-builder.js';
 // Global Cytoscape instance
 let cytoscapeInstance = null;
 
+// Dark mode state
+let darkMode = false;
+
+function lineColor() { return darkMode ? '#cccccc' : '#333333'; }
+function nodeTextColor() { return darkMode ? 'white' : 'black'; }
+function bgColor() { return darkMode ? '#1e1e1e' : '#ffffff'; }
+
 // Box dimensions for class nodes
 const NODE_WIDTH = 120;
 const NODE_HEIGHT = 40;
@@ -76,6 +83,42 @@ export function resetViewportState() {
 }
 
 /**
+ * Populate the diagram legend with ontology colors
+ */
+function updateDiagramLegend(graphColorMap) {
+  const legend = document.getElementById('diagram-legend');
+  if (!legend) return;
+
+  const entries = Object.entries(graphColorMap);
+  if (entries.length === 0) {
+    legend.style.display = 'none';
+    return;
+  }
+
+  // Extract short label from ontology URI
+  function shortLabel(uri) {
+    if (uri === 'unknown' || uri === 'inferred') return uri;
+    // Try fragment
+    if (uri.includes('#')) return uri.split('#').pop();
+    // Try last path segment, stripping trailing slash
+    const cleaned = uri.replace(/\/+$/, '');
+    return cleaned.split('/').pop();
+  }
+
+  legend.innerHTML = entries
+    .map(([uri, scheme]) => {
+      const label = shortLabel(uri);
+      return `<div class="legend-item">
+        <div class="legend-swatch" style="background: linear-gradient(to right, ${scheme.root} 50%, ${scheme.descendant} 50%)"></div>
+        <span class="legend-label" title="${uri}">${label}</span>
+      </div>`;
+    })
+    .join('');
+
+  legend.style.display = 'block';
+}
+
+/**
  * Create and configure Cytoscape instance
  * @param {Array} hierarchy - Class hierarchy data
  * @param {string} layoutType - Layout type: 'traditional' or 'rings'
@@ -118,6 +161,7 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
   // Store the color mapping globally for hierarchy tree coordination
   if (graphData.graphColorMap) {
     window.currentGraphColorMap = graphData.graphColorMap;
+    updateDiagramLegend(graphData.graphColorMap);
   }
   
   const { nodes, edges } = graphData;
@@ -137,6 +181,7 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
       };
 
   try {
+    container.style.backgroundColor = bgColor();
     const allElements = [...nodes, ...edges];
     console.log('[cytoscape-data] Full elements array:', JSON.stringify(allElements, null, 2));
     cytoscapeInstance = cytoscape({
@@ -239,6 +284,25 @@ export function fitDiagram() {
     
     // Save this as the new user preference
     saveUserViewport();
+  }
+}
+
+/**
+ * Toggle dark mode and re-render the diagram
+ */
+export function toggleDarkMode() {
+  darkMode = !darkMode;
+  if (cytoscapeInstance) {
+    const container = document.getElementById('cytoscape-container');
+    if (container) container.style.backgroundColor = bgColor();
+    cytoscapeInstance.style(getCytoscapeStyle());
+    // Update legend styling
+    const legend = document.getElementById('diagram-legend');
+    if (legend) {
+      legend.style.background = darkMode ? 'rgba(30, 30, 30, 0.92)' : 'rgba(255, 255, 255, 0.92)';
+      legend.style.color = darkMode ? '#ccc' : '#333';
+      legend.style.borderColor = darkMode ? '#555' : '#ccc';
+    }
   }
 }
 
@@ -468,9 +532,9 @@ function getCytoscapeStyle(nodes = []) {
       selector: 'edge[type="subclass"]',
       style: {
         'width': 2,
-        'line-color': '#333',
+        'line-color': lineColor(),
         'line-style': 'dashed',
-        'target-arrow-color': '#333',
+        'target-arrow-color': lineColor(),
         'target-arrow-shape': 'triangle',
         'curve-style': 'bezier',
         'arrow-scale': 1.2,
@@ -483,8 +547,8 @@ function getCytoscapeStyle(nodes = []) {
       selector: 'edge[type="property"]',
       style: {
         'width': 2,
-        'line-color': '#333333',
-        'target-arrow-color': '#333333',
+        'line-color': lineColor(),
+        'target-arrow-color': lineColor(),
         'target-arrow-shape': 'triangle',
         'curve-style': 'bezier',
         'arrow-scale': 1.2,
@@ -493,7 +557,7 @@ function getCytoscapeStyle(nodes = []) {
         'text-wrap': 'wrap',
         'text-rotation': 'autorotate',
         'text-margin-y': -10,
-        'color': '#333333',
+        'color': lineColor(),
         'text-outline-width': 0,
         'text-outline-color': 'transparent'
       }

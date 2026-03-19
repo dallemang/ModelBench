@@ -2,7 +2,7 @@
  * UI interaction handlers and controls
  */
 
-import { getCytoscapeInstance, resetDiagramLayout, fitDiagram, createClassDiagram } from './cytoscape-renderer.js';
+import { getCytoscapeInstance, resetDiagramLayout, fitDiagram, createClassDiagram, toggleDarkMode } from './cytoscape-renderer.js';
 
 /**
  * Switch between tabs
@@ -66,6 +66,13 @@ export function resetLayout() {
  */
 export function fitToScreen() {
   fitDiagram();
+}
+
+/**
+ * Toggle dark mode on the diagram
+ */
+export function toggleDark() {
+  toggleDarkMode();
 }
 
 /**

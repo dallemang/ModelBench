@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { createClassDiagram, resetViewportState } from './js/cytoscape-renderer.js';
-import { switchTab, resetLayout, fitToScreen, debugDiagramData, setLayoutType, setHierarchyData, getCurrentLayoutType } from './js/ui-controls.js';
+import { switchTab, resetLayout, fitToScreen, debugDiagramData, setLayoutType, setHierarchyData, getCurrentLayoutType, toggleDark } from './js/ui-controls.js';
 import { buildTreeHtml, selectClass, selectOntology, toggleNode, setTreeState, getClassData, getNamespaces, countClasses } from './js/tree-builder.js';
 import { assignColorsToGraphs } from './js/color-utils.js';
 
@@ -468,6 +468,7 @@ window.selectOntology = selectOntology;
 window.resetDiagramLayout = resetLayout;
 window.fitDiagram = fitToScreen;
 window.debugDiagramData = debugDiagramData;
+window.toggleDarkMode = toggleDark;
 window.setLayoutType = setLayoutType;
 window.navigateToClass = navigateToClass;
 window.getClassData = getClassData;

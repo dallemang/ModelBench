@@ -41,6 +41,9 @@ export function buildCytoscapeDataWithRings(hierarchy) {
   // Calculate ring matrix layout positions
   let layoutPositions = calculateRingMatrixLayout(hierarchy, graphNodes);
   
+  // Track which nodes have had their properties processed (separate from node creation)
+  const propertiesProcessed = new Set();
+
   // Recursively process hierarchy to collect all classes
   function processNode(node) {
     // Process children first and add subclass edges
@@ -59,35 +62,40 @@ export function buildCytoscapeDataWithRings(hierarchy) {
         processNode(child);
       });
     }
-    
-    // Only add the node itself if not already processed
-    if (processedClasses.has(node.uri)) {
-      return;
+
+    // Add the node itself if not already added
+    if (!processedClasses.has(node.uri)) {
+      processedClasses.add(node.uri);
+
+      // Add class node with ring layout position and color scheme
+      const position = layoutPositions[node.uri] || { x: 0, y: 0 };
+      const nodeCategory = categorizeNode(node.uri, rootNodeUris, descendantOfRootUris);
+      const graphSource = node.graph_source || 'unknown';
+      const colorScheme = graphColorMap[graphSource] || { root: '#28A745', descendant: '#4A90E2', orphaned: '#D8A7CA' };
+
+      // Get the actual color that will be used (for tracing)
+      const nodeColor = getNodeColor(node, graphColorMap, rootNodeUris, descendantOfRootUris, false, "DIAGRAM");
+
+      nodes.push({
+        data: {
+          id: node.uri,
+          label: node.label,
+          type: 'class',
+          category: nodeCategory,
+          graph_source: graphSource,
+          color_scheme: colorScheme
+        },
+        position: position
+      });
     }
-    processedClasses.add(node.uri);
-    
-    // Add class node with ring layout position and color scheme
-    const position = layoutPositions[node.uri] || { x: 0, y: 0 };
-    const nodeCategory = categorizeNode(node.uri, rootNodeUris, descendantOfRootUris);
-    const graphSource = node.graph_source || 'unknown';
-    const colorScheme = graphColorMap[graphSource] || { root: '#28A745', descendant: '#4A90E2', orphaned: '#D8A7CA' };
-    
-    // Get the actual color that will be used (for tracing)
-    const nodeColor = getNodeColor(node, graphColorMap, rootNodeUris, descendantOfRootUris, false, "DIAGRAM");
-    
-    nodes.push({
-      data: {
-        id: node.uri,
-        label: node.label,
-        type: 'class',
-        category: nodeCategory,
-        graph_source: graphSource,
-        color_scheme: colorScheme
-      },
-      position: position
-    });
-    
-    // Add property edges (solid lines) - these will be added after all nodes are positioned
+
+    // Always process properties when encountered in the hierarchy tree,
+    // even if the node was already added (e.g. as a range of another property).
+    // This ensures property edges are created for nodes that were first seen as ranges.
+    if (propertiesProcessed.has(node.uri)) return;
+    propertiesProcessed.add(node.uri);
+
+    // Add property edges (solid lines)
     if (node.properties && node.properties.length > 0) {
       node.properties.forEach(prop => {
         prop.ranges.forEach(range => {
@@ -164,6 +172,31 @@ export function buildCytoscapeDataWithRings(hierarchy) {
     }
   });
   
+  // Diagnostic: find edges with missing endpoints or duplicate IDs
+  const nodeIds = new Set(nodes.map(n => n.data.id));
+  const edgeIds = new Map();
+  edges.forEach(e => {
+    if (!nodeIds.has(e.data.source)) {
+      console.warn(`[edge-check] Edge "${e.data.label || e.data.type}" (${e.data.id}) has missing SOURCE node: ${e.data.source}`);
+    }
+    if (!nodeIds.has(e.data.target)) {
+      console.warn(`[edge-check] Edge "${e.data.label || e.data.type}" (${e.data.id}) has missing TARGET node: ${e.data.target}`);
+    }
+    if (edgeIds.has(e.data.id)) {
+      console.warn(`[edge-check] DUPLICATE edge ID: "${e.data.id}" — label="${e.data.label}" vs earlier label="${edgeIds.get(e.data.id)}"`);
+    }
+    edgeIds.set(e.data.id, e.data.label || e.data.type);
+  });
+
+  // Check for edges involving "Class" specifically
+  edges.forEach(e => {
+    const srcLabel = nodes.find(n => n.data.id === e.data.source)?.data.label;
+    const tgtLabel = nodes.find(n => n.data.id === e.data.target)?.data.label;
+    if (srcLabel === 'Class' || tgtLabel === 'Class') {
+      console.log(`[edge-check] Edge involving "Class": ${srcLabel} --[${e.data.label || e.data.type}]--> ${tgtLabel} (id: ${e.data.id})`);
+    }
+  });
+
   return { nodes, edges, graphNodes, graphColorMap };
 }
 

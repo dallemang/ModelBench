@@ -595,83 +595,77 @@ export function calculateRingLayout(hierarchy, centerX, centerY, startAngle) {
     const rootX = centerX + ringRadius * Math.cos(angle);
     const rootY = centerY + ringRadius * Math.sin(angle);
 
-    // Calculate tree layout with root at this position
-    const treeLayout = calculateTreeLayout(rootNode, rootX, rootY, angle);
+    // Calculate tree layout in concentric rings around the ring center
+    const treeLayout = calculateTreeLayout(rootNode, rootX, rootY, angle, centerX, centerY, ringRadius);
     Object.assign(layout, treeLayout);
   });
 
   return layout;
 }
 
-// ── Single-tree layout (radial outward from root) ───────────────
+// ── Single-tree layout (concentric rings outward from root) ─────
 
 /**
- * Calculate layout for a single tree growing outward from a root position
+ * Calculate layout for a single tree growing outward in concentric rings.
+ * Each depth level lives on a ring at radius = ringRadius + depth * layerHeight.
+ * Children are centered around their parent's angular position.
+ *
  * @param {Object} rootNode - The root node of the tree
  * @param {number} rootX - X position of the root
  * @param {number} rootY - Y position of the root
- * @param {number} angle - Angle from center for outward growth direction
+ * @param {number} rootAngle - Angle of the root on the ring (radians)
+ * @param {number} ringCenterX - X center of the ontology ring
+ * @param {number} ringCenterY - Y center of the ontology ring
+ * @param {number} ringRadius - Radius of the root ring
  * @returns {Object} Positions for all nodes in this tree
  */
-function calculateTreeLayout(rootNode, rootX, rootY, angle) {
+function calculateTreeLayout(rootNode, rootX, rootY, rootAngle, ringCenterX, ringCenterY, ringRadius) {
   const positions = {};
-  const nodeWidth = 150;
-  const layerHeight = 120;
+  const layerHeight = 180;
 
-  // Calculate direction vector - trees grow AWAY from center (outward)
-  const directionX = Math.cos(angle);
-  const directionY = Math.sin(angle);
+  // Angular width of one node at a given radius (keeps visual spacing consistent)
+  const nodeArcWidth = 150; // px of arc per leaf node
 
-  // Calculate perpendicular vector for horizontal spreading of children
-  const perpX = -directionY;
-  const perpY = directionX;
-
-  // First pass: calculate subtree widths
+  // First pass: calculate subtree widths (in leaf units)
   function calculateSubtreeWidth(node) {
     if (!node.children || node.children.length === 0) {
       return 1;
     }
-
-    const childrenWidth = node.children.reduce((total, child) => {
-      return total + calculateSubtreeWidth(child);
-    }, 0);
-
-    return Math.max(1, childrenWidth);
+    return node.children.reduce((total, child) => total + calculateSubtreeWidth(child), 0);
   }
 
-  // Second pass: assign positions based on subtree widths
-  function assignPositions(node, centerX, centerY, level, availableWidth) {
-    positions[node.uri] = { x: centerX, y: centerY };
+  // Second pass: assign positions on concentric rings
+  // Each node gets an angular span; its children divide that span proportionally.
+  function assignPositions(node, centerAngle, depth) {
+    const radius = ringRadius + depth * layerHeight;
+    positions[node.uri] = {
+      x: ringCenterX + radius * Math.cos(centerAngle),
+      y: ringCenterY + radius * Math.sin(centerAngle)
+    };
 
     if (node.children && node.children.length > 0) {
-      const childLevel = level + 1;
-      const childCenterX = centerX + directionX * layerHeight;
-      const childCenterY = centerY + directionY * layerHeight;
+      const childRadius = ringRadius + (depth + 1) * layerHeight;
+      const totalChildWidth = node.children.reduce((t, c) => t + calculateSubtreeWidth(c), 0);
 
-      const totalChildWidth = node.children.reduce((total, child) => {
-        return total + calculateSubtreeWidth(child);
-      }, 0);
+      // Angular span needed for children at their radius
+      const totalArc = totalChildWidth * nodeArcWidth / childRadius;
 
-      const startOffset = (totalChildWidth - 1) * nodeWidth / 2;
-      let currentOffset = -startOffset;
+      // Center the children's span on the parent's angle
+      let currentAngle = centerAngle - totalArc / 2;
 
       node.children.forEach(child => {
-        const childSubtreeWidth = calculateSubtreeWidth(child);
-        const childOffset = currentOffset + (childSubtreeWidth - 1) * nodeWidth / 2;
+        const childWidth = calculateSubtreeWidth(child);
+        const childArc = childWidth * nodeArcWidth / childRadius;
+        const childAngle = currentAngle + childArc / 2;
 
-        const childX = childCenterX + perpX * childOffset;
-        const childY = childCenterY + perpY * childOffset;
+        assignPositions(child, childAngle, depth + 1);
 
-        assignPositions(child, childX, childY, childLevel, childSubtreeWidth);
-
-        currentOffset += childSubtreeWidth * nodeWidth;
+        currentAngle += childArc;
       });
     }
   }
 
-  // Start positioning from the root
-  const rootSubtreeWidth = calculateSubtreeWidth(rootNode);
-  assignPositions(rootNode, rootX, rootY, 0, rootSubtreeWidth);
+  assignPositions(rootNode, rootAngle, 0);
 
   return positions;
 }

@@ -128,7 +128,7 @@ function setupLegendHighlighting(cy) {
     document.querySelectorAll('#diagram-legend .legend-item').forEach(item => {
       if (item.dataset.graph === graphSource) {
         item.style.fontWeight = 'bold';
-        item.style.background = 'rgba(50,120,220,0.35)';
+        item.style.background = darkMode ? 'rgba(255,255,0,0.35)' : 'rgba(50,120,220,0.35)';
         item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
     });

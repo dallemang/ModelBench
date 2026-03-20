@@ -108,7 +108,7 @@ function updateDiagramLegend(graphColorMap) {
   legend.innerHTML = entries
     .map(([uri, scheme]) => {
       const label = shortLabel(uri);
-      return `<div class="legend-item">
+      return `<div class="legend-item" data-graph="${uri}">
         <div class="legend-swatch" style="background: linear-gradient(to right, ${scheme.root} 50%, ${scheme.descendant} 50%)"></div>
         <span class="legend-label" title="${uri}">${label}</span>
       </div>`;
@@ -116,6 +116,30 @@ function updateDiagramLegend(graphColorMap) {
     .join('');
 
   legend.style.display = 'block';
+}
+
+/**
+ * Set up hover highlighting between diagram nodes and the legend
+ */
+function setupLegendHighlighting(cy) {
+  cy.on('mouseover', 'node[type="class"]', (evt) => {
+    const graphSource = evt.target.data('graph_source');
+    if (!graphSource) return;
+    document.querySelectorAll('#diagram-legend .legend-item').forEach(item => {
+      if (item.dataset.graph === graphSource) {
+        item.style.fontWeight = 'bold';
+        item.style.background = 'rgba(50,120,220,0.35)';
+        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    });
+  });
+
+  cy.on('mouseout', 'node[type="class"]', () => {
+    document.querySelectorAll('#diagram-legend .legend-item').forEach(item => {
+      item.style.fontWeight = '';
+      item.style.background = '';
+    });
+  });
 }
 
 /**
@@ -201,6 +225,9 @@ export function createClassDiagram(hierarchy, layoutType = 'rings') {
   
   // Add interaction handlers for editing
   addEditingHandlers(cytoscapeInstance);
+
+  // Set up legend highlighting on node hover
+  setupLegendHighlighting(cytoscapeInstance);
   
   // Track user viewport changes (zoom, pan, drag)
   cytoscapeInstance.on('zoom pan drag', function() {

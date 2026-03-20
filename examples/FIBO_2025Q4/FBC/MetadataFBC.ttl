@@ -1,0 +1,93 @@
+# baseURI: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/MetadataFBC/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/DebtAndEquities/MetadataFBCDebtAndEquities/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/FinancialInstruments/MetadataFBCFinancialInstruments/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/FunctionalEntities/MetadataFBCFunctionalEntities/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/ProductsAndServices/MetadataFBCProductsAndServices/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FND/Utilities/AnnotationVocabulary/
+# imports: https://www.omg.org/spec/Commons/AnnotationVocabulary/
+
+@base <https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/MetadataFBC/> .
+@prefix cmns-av: <https://www.omg.org/spec/Commons/AnnotationVocabulary/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fibo-fbc-dae-mod: <https://spec.edmcouncil.org/fibo/ontology/FBC/DebtAndEquities/MetadataFBCDebtAndEquities/> .
+@prefix fibo-fbc-fct-mod: <https://spec.edmcouncil.org/fibo/ontology/FBC/FunctionalEntities/MetadataFBCFunctionalEntities/> .
+@prefix fibo-fbc-fi-mod: <https://spec.edmcouncil.org/fibo/ontology/FBC/FinancialInstruments/MetadataFBCFinancialInstruments/> .
+@prefix fibo-fbc-mod: <https://spec.edmcouncil.org/fibo/ontology/FBC/MetadataFBC/> .
+@prefix fibo-fbc-pas-mod: <https://spec.edmcouncil.org/fibo/ontology/FBC/ProductsAndServices/MetadataFBCProductsAndServices/> .
+@prefix fibo-fnd-utl-av: <https://spec.edmcouncil.org/fibo/ontology/FND/Utilities/AnnotationVocabulary/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://spec.edmcouncil.org/fibo/ontology/FBC/MetadataFBC/>
+	a owl:Ontology ;
+	rdfs:label "Metadata about the EDMC-FIBO Financial Business and Commerce (FBC) Domain" ;
+	dcterms:abstract "This ontology provides metadata about the FIBO Financial Business and Commerce (FBC) Domain, which covers business concepts that are common to common to a number of finance domain areas, such as loans, securities, and corporate actions, including products and services, financial intermediaries, registrars and regulators, and financial instruments and products." ;
+	dcterms:issued "2015-08-13T18:00:00"^^xsd:dateTime ;
+	dcterms:license "http://opensource.org/licenses/MIT"^^xsd:anyURI ;
+	dcterms:modified "2023-01-30T18:00:00"^^xsd:dateTime ;
+	owl:imports
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/DebtAndEquities/MetadataFBCDebtAndEquities/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/FinancialInstruments/MetadataFBCFinancialInstruments/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/FunctionalEntities/MetadataFBCFunctionalEntities/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/ProductsAndServices/MetadataFBCProductsAndServices/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FND/Utilities/AnnotationVocabulary/> ,
+		<https://www.omg.org/spec/Commons/AnnotationVocabulary/>
+		;
+	owl:versionIRI <https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FBC/MetadataFBC/> ;
+	cmns-av:copyright
+		"Copyright (c) 2015-2023 EDM Council, Inc." ,
+		"Copyright (c) 2015-2023 Object Management Group, Inc."
+		;
+	.
+
+fibo-fbc-mod:FBCDomain
+	a
+		owl:NamedIndividual ,
+		fibo-fnd-utl-av:Module
+		;
+	rdfs:label "financial business and commerce domain" ;
+	dcterms:abstract "The financial business and commerce domain covers business concepts that are common to common to a number of finance areas, such as loans, securities, and corporate actions, including products and services, financial intermediaries, registrars and regulators, and financial instruments and products." ;
+	dcterms:contributor
+		"Adaptive, Inc." ,
+		"Bloomberg LP" ,
+		"Capacity Post, Inc." ,
+		"Citigroup" ,
+		"Credit Suisse" ,
+		"Dassault Systemes / No Magic" ,
+		"Deutsche Bank" ,
+		"Exprentis" ,
+		"Federated Knowledge LLC" ,
+		"John F. Gemski" ,
+		"Nordea Bank AB" ,
+		"Office of Financial Research (US Dept of the Treasury)" ,
+		"Pinnacle Bank (Morgan Hill, California)" ,
+		"Quarule" ,
+		"State Street Bank and Trust" ,
+		"Statistics Canada" ,
+		"Tahoe Blue Ltd" ,
+		"Thematix Partners LLC" ,
+		"Wells Fargo" ,
+		"agnos.ai UK Ltd."
+		;
+	dcterms:creator "https://wiki.edmcouncil.org/pages/viewpage.action?pageId=786677"^^xsd:anyURI ;
+	dcterms:hasPart
+		fibo-fbc-dae-mod:DebtAndEquitiesModule ,
+		fibo-fbc-fi-mod:FinancialInstrumentsModule ,
+		fibo-fbc-fct-mod:FunctionalEntitiesModule ,
+		fibo-fbc-pas-mod:FBCProductsAndServicesModule
+		;
+	dcterms:license "http://opensource.org/licenses/MIT"^^xsd:anyURI ;
+	dcterms:title
+		"EDMC Financial Industry Business Ontology (FIBO) Financial Business and Commerce (FBC) Domain" ,
+		"FIBO FBC Domain"
+		;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/fibo/ontology/FBC/MetadataFBC/> ;
+	rdfs:seeAlso <https://spec.edmcouncil.org/fibo/> ;
+	cmns-av:copyright
+		"Copyright (c) 2015-2023 EDM Council, Inc." ,
+		"Copyright (c) 2015-2023 Object Management Group, Inc."
+		;
+	.
+

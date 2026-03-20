@@ -1,0 +1,100 @@
+# baseURI: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/MetadataIND/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FND/Utilities/AnnotationVocabulary/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/EconomicIndicators/MetadataINDEconomicIndicators/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/ForeignExchange/MetadataINDForeignExchange/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/Indicators/MetadataINDIndicators/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/InterestRates/MetadataINDInterestRates/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/MarketIndices/MetadataINDMarketIndices/
+# imports: https://www.omg.org/spec/Commons/AnnotationVocabulary/
+
+@base <https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/MetadataIND/> .
+@prefix cmns-av: <https://www.omg.org/spec/Commons/AnnotationVocabulary/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fibo-fnd-utl-av: <https://spec.edmcouncil.org/fibo/ontology/FND/Utilities/AnnotationVocabulary/> .
+@prefix fibo-ind-ei-mod: <https://spec.edmcouncil.org/fibo/ontology/IND/EconomicIndicators/MetadataINDEconomicIndicators/> .
+@prefix fibo-ind-fx-mod: <https://spec.edmcouncil.org/fibo/ontology/IND/ForeignExchange/MetadataINDForeignExchange/> .
+@prefix fibo-ind-ind-mod: <https://spec.edmcouncil.org/fibo/ontology/IND/Indicators/MetadataINDIndicators/> .
+@prefix fibo-ind-ir-mod: <https://spec.edmcouncil.org/fibo/ontology/IND/InterestRates/MetadataINDInterestRates/> .
+@prefix fibo-ind-mkt-mod: <https://spec.edmcouncil.org/fibo/ontology/IND/MarketIndices/MetadataINDMarketIndices/> .
+@prefix fibo-ind-mod: <https://spec.edmcouncil.org/fibo/ontology/IND/MetadataIND/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://spec.edmcouncil.org/fibo/ontology/IND/MetadataIND/>
+	a owl:Ontology ;
+	rdfs:label "Metadata about the EDMC-FIBO Indices and Indicators (IND) Domain" ;
+	dcterms:abstract "This ontology provides metadata about the FIBO Indices and Indicators (IND) Domain, which covers market indices and reference rates including economic indicators, foreign exchange, interest rates, and other benchmarks." ;
+	dcterms:issued "2018-08-27T18:00:00"^^xsd:dateTime ;
+	dcterms:license "https://opensource.org/licenses/MIT"^^xsd:anyURI ;
+	dcterms:modified "2023-03-31T18:00:00"^^xsd:dateTime ;
+	owl:imports
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FND/Utilities/AnnotationVocabulary/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/EconomicIndicators/MetadataINDEconomicIndicators/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/ForeignExchange/MetadataINDForeignExchange/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/Indicators/MetadataINDIndicators/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/InterestRates/MetadataINDInterestRates/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/MarketIndices/MetadataINDMarketIndices/> ,
+		<https://www.omg.org/spec/Commons/AnnotationVocabulary/>
+		;
+	owl:versionIRI <https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/IND/MetadataIND/> ;
+	cmns-av:copyright
+		"Copyright (c) 2014-2023 EDM Council, Inc." ,
+		"Copyright (c) 2014-2023 Object Management Group, Inc."
+		;
+	.
+
+fibo-ind-mod:INDDomain
+	a
+		owl:NamedIndividual ,
+		fibo-fnd-utl-av:Module
+		;
+	rdfs:label "indices and indicators module" ;
+	dcterms:abstract "The FIBO Indices and Indicators (IND) Domain covers market indices and reference rates including economic indicators, foreign exchange, interest rates, and other benchmarks. The ontologies cover quoted interest rates, economic measures such as employment rates, and quoted indices required to support baskets of securities, including specific kinds of securities in share indices or bond indices, as well as credit indices." ;
+	dcterms:contributor
+		"88 Solutions" ,
+		"Adaptive, Inc." ,
+		"Bank of New York Mellon" ,
+		"Bloomberg LP" ,
+		"Bureau of Economic Analysis (BEA, US Department of Commerce)" ,
+		"Bureau of Labor Statistics (BLS, US Department of Commerce)" ,
+		"Census Bureau (US Department of Commerce)" ,
+		"Citigroup" ,
+		"Dassault Systemes/No Magic" ,
+		"Deutsche Bank" ,
+		"Federal Reserve Bank of Kansas City" ,
+		"HP Enterprise / Mphasis" ,
+		"John F. Gemski" ,
+		"John F. Tierney" ,
+		"Nordea Bank AB" ,
+		"Office of Financial Research (OFR), U.S. Department of the Treasury" ,
+		"Pinnacle Bank (Morgan Hill, California)" ,
+		"State Street Bank and Trust" ,
+		"Statistics Canada" ,
+		"Tahoe Blue Ltd" ,
+		"Thematix Partners LLC" ,
+		"Wells Fargo Bank, N. A." ,
+		"agnos.ai UK Ltd"
+		;
+	dcterms:creator "https://wiki.edmcouncil.org/display/IND/FIBO+-+FCT+-+Indices+and+Indicators+Home"^^xsd:anyURI ;
+	dcterms:hasPart
+		fibo-ind-ei-mod:EconomicIndicatorsModule ,
+		fibo-ind-fx-mod:ForeignExchangeModule ,
+		fibo-ind-ind-mod:IndicatorsModule ,
+		fibo-ind-ir-mod:InterestRatesModule ,
+		fibo-ind-mkt-mod:MarketIndicesModule
+		;
+	dcterms:license "http://opensource.org/licenses/MIT"^^xsd:anyURI ;
+	dcterms:title
+		"FIBO IND Domain" ,
+		"Financial Industry Business Ontology (FIBO) Indices and Indicators (IND) Domain"
+		;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/fibo/ontology/IND/MetadataIND/> ;
+	rdfs:seeAlso <https://www.edmcouncil.org/fibo/> ;
+	cmns-av:copyright
+		"Copyright (c) 2014-2023 EDM Council, Inc." ,
+		"Copyright (c) 2014-2023 Object Management Group, Inc."
+		;
+	.
+

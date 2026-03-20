@@ -1,0 +1,56 @@
+# baseURI: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/BP/MetadataBP/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/BP/Process/MetadataBPProcess/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/BP/SecuritiesIssuance/MetadataBPSecuritiesIssuance/
+# imports: https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FND/Utilities/AnnotationVocabulary/
+# imports: https://www.omg.org/spec/Commons/AnnotationVocabulary/
+
+@base <https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/BP/MetadataBP/> .
+@prefix cmns-av: <https://www.omg.org/spec/Commons/AnnotationVocabulary/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix fibo-bp-iss-mod: <https://spec.edmcouncil.org/fibo/ontology/BP/SecuritiesIssuance/MetadataBPSecuritiesIssuance/> .
+@prefix fibo-bp-mod: <https://spec.edmcouncil.org/fibo/ontology/BP/MetadataBP/> .
+@prefix fibo-bp-prc-mod: <https://spec.edmcouncil.org/fibo/ontology/BP/Process/MetadataBPProcess/> .
+@prefix fibo-fnd-utl-av: <https://spec.edmcouncil.org/fibo/ontology/FND/Utilities/AnnotationVocabulary/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://spec.edmcouncil.org/fibo/ontology/BP/MetadataBP/>
+	a owl:Ontology ;
+	rdfs:label "Metadata for the EDMC-FIBO Business Process (BP) Domain" ;
+	dcterms:abstract "The Business Process (BP) domain includes ontologies that define financial process flows such as securities issuance and transaction workflows. In the case of securities issuance process models, these are provided in order to be able to represent reference data concepts that are dependent on the process by which a security was issued. Transaction process semantics provide the basis for the temporal dimension of securities and derivatives transactions.  These are process models represented using basic semantic primitive concepts of events, activities and control flows." ;
+	dcterms:issued "2018-03-01T18:00:00"^^xsd:dateTime ;
+	dcterms:license "http://opensource.org/licenses/MIT"^^xsd:anyURI ;
+	dcterms:modified "2023-03-31T18:00:00"^^xsd:dateTime ;
+	owl:imports
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/BP/Process/MetadataBPProcess/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/BP/SecuritiesIssuance/MetadataBPSecuritiesIssuance/> ,
+		<https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/FND/Utilities/AnnotationVocabulary/> ,
+		<https://www.omg.org/spec/Commons/AnnotationVocabulary/>
+		;
+	owl:versionIRI <https://spec.edmcouncil.org/fibo/ontology/master/2025Q4/BP/MetadataBP/> ;
+	cmns-av:copyright "Copyright (c) 2013-2023 EDM Council, Inc." ;
+	.
+
+fibo-bp-mod:BPDomain
+	a
+		owl:NamedIndividual ,
+		fibo-fnd-utl-av:Module
+		;
+	rdfs:label "business process domain" ;
+	dcterms:abstract "The Business Process (BP) domain includes ontologies that define financial process flows such as securities issuance and transaction workflows. In the case of securities issuance process models, these are provided in order to be able to represent reference data concepts that are dependent on the process by which a security was issued. Transaction process semantics provide the basis for the temporal dimension of securities and derivatives transactions.  These are process models represented using basic semantic primitive concepts of events, activities and control flows." ;
+	dcterms:hasPart
+		fibo-bp-prc-mod:ProcessModule ,
+		fibo-bp-iss-mod:SecuritiesIssuanceModule
+		;
+	dcterms:license "http://opensource.org/licenses/MIT"^^xsd:anyURI ;
+	dcterms:title
+		"FIBO BP Domain" ,
+		"Financial Industry Business Ontology (FIBO) Business Process (BP) Domain"
+		;
+	rdfs:isDefinedBy <https://spec.edmcouncil.org/fibo/ontology/BP/MetadataBP/> ;
+	rdfs:seeAlso <https://spec.edmcouncil.org/fibo/> ;
+	cmns-av:copyright "Copyright (c) 2013-2023 EDM Council, Inc." ;
+	.
+

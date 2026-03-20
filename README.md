@@ -55,6 +55,16 @@ The `examples/CDMC/` directory contains the EDM Council's Cloud Data Management 
 2. Use **File > Open** and select `examples/CDMC/AboutCDMC.ttl`
 3. OntoBench will automatically discover and load all 9 imported ontologies from the same directory
 
+The `examples/FIBO_2025Q4/` directory contains the EDM Council's Financial Industry Business Ontology (FIBO) Production release -- 220 interconnected ontology files covering business entities, financial instruments, derivatives, indices, and more. To try it:
+
+1. Launch OntoBench
+2. Use **File > Open** and select `examples/FIBO_2025Q4/AboutFIBOProd.ttl`
+3. OntoBench will recursively discover and load all imported ontologies
+
+**Warning:** FIBO is vastly larger and more complex than CDMC. Expect the visualization to be dense and harder to navigate -- the ring layout works best with smaller ontology suites. SPARQL queries and the tree view are more practical ways to explore FIBO.
+
+For a more manageable subset, try loading a single FIBO module such as `examples/FIBO_2025Q4/BE/SoleProprietorships/SoleProprietorships.ttl` -- OntoBench will pull in only its direct imports, giving you a smaller, more readable diagram.
+
 ## Features
 
 ### Automatic Import Resolution

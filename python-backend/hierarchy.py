@@ -3,8 +3,51 @@
 Hierarchy building module for OntoBench - builds hierarchical tree structures from RDF data
 """
 
+import re
+
 from rdflib import BNode, Literal
 from rdflib.namespace import RDF, RDFS, OWL
+
+
+def guess_namespace_and_label(uri_str):
+    """Extract a namespace URI and a human-readable label from an external class URI.
+
+    Returns (namespace_uri, label) where:
+    - namespace_uri is everything up to and including the last '#' or '/'
+    - label is a best-guess readable name derived from the namespace path
+    """
+    # Split into namespace and local part
+    if '#' in uri_str:
+        ns = uri_str[:uri_str.rfind('#') + 1]
+    elif '/' in uri_str:
+        ns = uri_str[:uri_str.rfind('/') + 1]
+    else:
+        return uri_str, uri_str
+
+    # Derive a readable label from the namespace path
+    # Strip trailing # or /
+    path = ns.rstrip('#/')
+
+    # Take the last meaningful path segment
+    if '/' in path:
+        segment = path.split('/')[-1]
+    else:
+        segment = path
+
+    # If the segment is empty or purely numeric or a version-like string, go one level up
+    if not segment or segment.replace('.', '').replace('-', '').isdigit():
+        parts = path.split('/')
+        if len(parts) >= 2:
+            segment = parts[-2]
+
+    # Un-camelCase: insert spaces before capitals (e.g., "DatatypeProperty" -> "Datatype Property")
+    label = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', segment)
+    # Replace hyphens and underscores with spaces
+    label = label.replace('-', ' ').replace('_', ' ')
+    # Capitalize first letter of each word
+    label = label.title()
+
+    return ns, label
 
 
 def is_deprecated(dataset, resource):
@@ -359,14 +402,18 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
                             curie_label = parent_str.split('#')[-1]
                         elif '/' in parent_str:
                             curie_label = parent_str.split('/')[-1]
-                        
+
+                        # Use the namespace as graph_source so external classes
+                        # group by their origin ontology/vocabulary
+                        ext_ns, _ext_label = guess_namespace_and_label(parent_str)
+
                         hierarchy[parent_str] = {
                             "uri": parent_str,
                             "label": curie_label,
                             "children": [],
                             "properties": [],
                             "annotations": [],
-                            "graph_source": "inferred",
+                            "graph_source": ext_ns,
                             "is_inferred": True
                         }
                         

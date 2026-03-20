@@ -97,12 +97,22 @@ function updateDiagramLegend(graphColorMap) {
 
   // Extract short label from ontology URI
   function shortLabel(uri) {
-    if (uri === 'unknown' || uri === 'inferred') return uri;
-    // Try fragment
-    if (uri.includes('#')) return uri.split('#').pop();
-    // Try last path segment, stripping trailing slash
-    const cleaned = uri.replace(/\/+$/, '');
-    return cleaned.split('/').pop();
+    if (uri === 'unknown') return uri;
+    // Strip trailing # or /
+    let cleaned = uri.replace(/[#/]+$/, '');
+    // Take last path segment
+    let segment = cleaned.includes('/') ? cleaned.split('/').pop() : cleaned;
+    // If segment is empty or purely numeric/version-like, go one level up
+    if (!segment || /^[\d.\-]+$/.test(segment)) {
+      const parts = cleaned.split('/');
+      if (parts.length >= 2) segment = parts[parts.length - 2];
+    }
+    // Un-camelCase: "DatatypeProperty" -> "Datatype Property"
+    segment = segment.replace(/([a-z])([A-Z])/g, '$1 $2');
+    // Replace hyphens/underscores with spaces and title-case
+    segment = segment.replace(/[-_]/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
+    return segment;
   }
 
   legend.innerHTML = entries

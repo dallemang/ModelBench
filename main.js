@@ -1,5 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
+import { apiGet, apiPost, apiUpload, BACKEND } from './js/api.js';
 import { createClassDiagram, resetViewportState } from './js/cytoscape-renderer.js';
 import { switchTab, resetLayout, fitToScreen, debugDiagramData, setLayoutType, setHierarchyData, getCurrentLayoutType, toggleDark } from './js/ui-controls.js';
 import { buildTreeHtml, selectClass, selectOntology, toggleNode, setTreeState, getClassData, getNamespaces, countClasses } from './js/tree-builder.js';
@@ -126,7 +125,7 @@ function buildImportsTable(importResults) {
 async function detectBackendPort() {
   try {
     // Try to get graph info which will trigger the backend to start if needed
-    const result = await invoke('get_graph_info');
+    const result = await apiGet('/graph_info');
     // If successful, we can try to detect the actual port by checking network requests
     // For now, we'll use a default approach
     
@@ -263,64 +262,50 @@ async function handleLoadResponse(response, source) {
 }
 
 async function loadFile() {
-  try {
-    const selected = await open({
-      title: 'Select an RDF file',
-      multiple: false,
-      filters: [{
-        name: 'RDF Files',
-        extensions: ['ttl', 'rdf', 'owl', 'n3', 'nt']
-      }, {
-        name: 'Turtle Files',
-        extensions: ['ttl']
-      }, {
-        name: 'All Files',
-        extensions: ['*']
-      }]
-    });
+  // Trigger hidden file input
+  let input = document.getElementById('rdf-file-input');
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'file';
+    input.id = 'rdf-file-input';
+    input.accept = '.ttl,.rdf,.owl,.n3,.nt';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+  }
 
-    if (selected) {
-      // Reset viewport state for new file load
-      resetViewportState();
-      
-      // Show loading message in log
-      const graphStats = document.getElementById('graph-stats');
-      
-      graphStats.innerHTML = `<p>Loading: ${selected}...</p>`;
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+
+    resetViewportState();
+    const graphStats = document.getElementById('graph-stats');
+    graphStats.innerHTML = `<p>Loading: ${file.name}...</p>`;
+    document.getElementById('tab-container').style.display = 'block';
+    switchTab('log');
+
+    try {
+      const response = await apiUpload('/upload_rdf', file);
+      await handleLoadResponse(response, file.name);
+    } catch (error) {
+      graphStats.innerHTML = `
+        <div style="color: #dc3545; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 15px;">
+          <strong>Backend Error:</strong> ${error}
+        </div>
+      `;
       document.getElementById('tab-container').style.display = 'block';
       switchTab('log');
-      
-      try {
-        // Call HTTP backend to load RDF file
-        const response = await invoke('load_rdf_file', {
-          filePath: selected
-        });
-
-        console.log('Python response:', response);
-
-        await handleLoadResponse(response, selected);
-        
-      } catch (error) {
-        console.error('Error calling Python backend:', error);
-        graphStats.innerHTML = `
-          <div style="color: #dc3545; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 15px;">
-            <strong>Backend Error:</strong> ${error}
-          </div>
-        `;
-        document.getElementById('tab-container').style.display = 'block';
-        switchTab('log');
-      }
     }
-  } catch (error) {
-    console.error('Error selecting file:', error);
-  }
+  };
+
+  input.click();
 }
 
 // Function to close/clear the dataset
 async function closeDataset() {
   try {
     // Call the backend to clear the dataset
-    const response = await invoke('clear_dataset');
+    const response = await apiPost('/clear_dataset', {});
     
     console.log('Clear dataset response:', response);
     
@@ -385,7 +370,7 @@ async function loadFromUrl() {
   switchTab('log');
 
   try {
-    const response = await invoke('load_rdf_file', { filePath: trimmed });
+    const response = await apiPost('/load_rdf', { file_path: trimmed });
     await handleLoadResponse(response, trimmed);
   } catch (error) {
     graphStats.innerHTML = `
@@ -514,7 +499,7 @@ async function buildHierarchyFromBackend() {
     console.log('Building hierarchy from backend...');
     
     // Query the backend for current hierarchy
-    const response = await invoke('get_hierarchy');
+    const response = await apiGet('/hierarchy');
     
     if (response.success && response.hierarchy) {
       console.log('Got hierarchy from backend:', response.hierarchy.length, 'root nodes');
@@ -606,7 +591,7 @@ async function buildImportHierarchyFromBackend() {
     
     // Race the actual call against the timeout
     const response = await Promise.race([
-      invoke('get_import_hierarchy'),
+      apiGet('/import_hierarchy'),
       timeoutPromise
     ]);
     

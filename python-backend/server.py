@@ -9,9 +9,11 @@ import os
 import re
 import uuid
 from typing import Optional, List
-from fastapi import FastAPI, HTTPException
+import tempfile
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from rdflib import Graph, Dataset, URIRef, Literal, BNode
 from rdflib.namespace import RDF, RDFS, OWL
@@ -61,7 +63,7 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:1420", "https://tauri.localhost"],  # Tauri frontend origins
+    allow_origins=["*"],  # Frontend is same-origin in production; open for local dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -109,6 +111,27 @@ def load_rdf_file_endpoint(request: LoadRdfRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load RDF file: {str(e)}")
+
+@app.post("/upload_rdf")
+async def upload_rdf_file_endpoint(file: UploadFile = File(...)):
+    """Load an RDF file uploaded from the browser."""
+    suffix = os.path.splitext(file.filename)[1] if file.filename else '.ttl'
+    if not suffix:
+        suffix = '.ttl'
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+    try:
+        result = load_rdf_file(tmp_path)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        os.unlink(tmp_path)
 
 @app.get("/graph_info")
 def get_graph_info_endpoint():
@@ -510,11 +533,16 @@ def update_ai_config(request: AIConfigRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Configuration update error: {str(e)}")
 
+# Serve the built frontend from ../dist if it exists (production / local web mode)
+_dist_dir = os.path.join(os.path.dirname(__file__), '..', 'dist')
+if os.path.isdir(_dist_dir):
+    app.mount("/", StaticFiles(directory=_dist_dir, html=True), name="static")
+
 if __name__ == "__main__":
     import uvicorn
-    
-    # Get port from command line argument or use default
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8731
-    
-    print(f"Starting OntoBench HTTP server on port {port}")
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
+
+    # Railway (and most cloud platforms) inject PORT as an env var
+    port = int(os.environ.get('PORT', sys.argv[1] if len(sys.argv) > 1 else 8000))
+
+    print(f"Starting OntoBench server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

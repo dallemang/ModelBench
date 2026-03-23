@@ -910,15 +910,9 @@ function addEditingHandlers(cy) {
  * @returns {Promise} Response from backend
  */
 async function addTripleToBackend(subject, predicate, object) {
-  const { invoke } = await import('@tauri-apps/api/core');
-  
+  const { apiPost } = await import('./api.js');
   try {
-    const response = await invoke('add_triple', {
-      subject: subject,
-      predicate: predicate,
-      object: object
-    });
-    
+    const response = await apiPost('/add_triple', { subject, predicate, object });
     return response;
   } catch (error) {
     throw new Error(`Backend call failed: ${error}`);

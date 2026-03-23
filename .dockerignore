@@ -1,0 +1,8 @@
+node_modules/
+dist/
+src-tauri/
+python-backend/venv/
+python-backend/__pycache__/
+python-backend/ai_config.json
+.git/
+*.md

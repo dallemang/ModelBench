@@ -3,48 +3,15 @@
  * Handles AI provider configuration and chat interface
  */
 
+import { BACKEND } from './api.js';
+
 let currentAIConfig = null;
 let currentProvidersStatus = null;
 let chatMessages = [];
 
-// Function to detect the current Python backend port
-async function detectBackendPort() {
-    try {
-        // Get the backend port directly from Tauri using the proper import
-        const { invoke } = await import('@tauri-apps/api/core');
-        const port = await invoke('get_backend_port');
-        
-        window.API_BASE_URL = `http://127.0.0.1:${port}`;
-        console.log(`AI interface got backend port ${port} from Tauri`);
-        return;
-    } catch (e) {
-        console.warn('Failed to get backend port from Tauri:', e);
-        
-        // Fallback: try a few common ports quickly
-        const fallbackPorts = [8731, 62886, 62041, 61918];
-        for (const port of fallbackPorts) {
-            try {
-                const response = await fetch(`http://127.0.0.1:${port}/health`);
-                if (response.ok) {
-                    window.API_BASE_URL = `http://127.0.0.1:${port}`;
-                    console.log(`AI interface detected backend on fallback port ${port}`);
-                    return;
-                }
-            } catch (e) {
-                // Try next port
-            }
-        }
-        
-        console.warn('AI interface could not detect backend port, using default');
-        window.API_BASE_URL = 'http://127.0.0.1:8731'; // fallback
-    }
-}
-
 // Initialize AI interface
 async function initAI() {
     try {
-        // Detect backend port before making AI calls
-        await detectBackendPort();
         await loadAIConfig();
         await loadProvidersStatus();
         setupAIEventListeners();
@@ -111,7 +78,7 @@ async function loadAIConfig() {
 // Load providers status
 async function loadProvidersStatus() {
     try {
-        const response = await fetch(`${window.API_BASE_URL}/ai/providers`);
+        const response = await fetch(`${BACKEND}/ai/providers`);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -309,7 +276,7 @@ async function saveAIConfig() {
         updates.providers[activeProvider] = providerConfig;
         
         // Send update to backend HTTP API
-        const response = await fetch(`${window.API_BASE_URL}/ai/config`, {
+        const response = await fetch(`${BACKEND}/ai/config`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -363,7 +330,7 @@ async function sendAIMessage() {
         messages.push({ role: 'user', content: userMessage });
         
         // Send to AI via HTTP API
-        const response = await fetch(`${window.API_BASE_URL}/ai/chat`, {
+        const response = await fetch(`${BACKEND}/ai/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

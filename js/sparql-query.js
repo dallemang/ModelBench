@@ -3,6 +3,8 @@
  * Handles SPARQL query execution and result display
  */
 
+import { BACKEND } from './api.js';
+
 // Run SPARQL query
 async function runSparqlQuery() {
     const queryInput = document.getElementById('sparql-query-input');
@@ -27,14 +29,12 @@ async function runSparqlQuery() {
     showQueryStatus('Executing query...', 'info');
     
     try {
-        // Import Tauri API
-        const { invoke } = await import('@tauri-apps/api/core');
-        
-        // Execute query through Tauri backend
-        const response = await invoke('query_graph', { sparqlQuery: query });
-        
-        // Tauri wraps the response in a 'data' property
-        const data = response.data || response;
+        const res = await fetch(`${BACKEND}/query`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sparql_query: query }),
+        });
+        const data = await res.json();
         
         if (data && data.error) {
             showQueryStatus(`${data.error}`, 'error');
@@ -342,24 +342,11 @@ async function fixSparqlQuery() {
     showQueryStatus('Asking AI to fix the query...', 'info');
     
     try {
-        // Ensure we have the correct backend URL
-        if (!window.API_BASE_URL) {
-            // Try to detect the backend port if not already set
-            const { invoke } = await import('@tauri-apps/api/core');
-            try {
-                const port = await invoke('get_backend_port');
-                window.API_BASE_URL = `http://127.0.0.1:${port}`;
-            } catch (e) {
-                window.API_BASE_URL = 'http://127.0.0.1:8731'; // fallback
-            }
-        }
-        const apiBaseUrl = window.API_BASE_URL;
-        
         // Create AI prompt
         const prompt = `The user tried to write a SPARQL query of this form: ${lastFailedQuery}. This resulted in an error message from the query processor: ${lastErrorMessage}. Please re-write the query to correct for this error. Enclose your new query inside of triple ticks.`;
         
         // Send to AI
-        const response = await fetch(`${apiBaseUrl}/ai/chat`, {
+        const response = await fetch(`${BACKEND}/ai/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

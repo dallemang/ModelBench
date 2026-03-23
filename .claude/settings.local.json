@@ -11,7 +11,9 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"Add Follow Your Nose \\(FYN\\) HTTP import resolution and Load from URL feature:*)",
       "Bash(git push:*)",
-      "Bash(git commit -m \"Add Follow Your Nose HTTP import resolution with GitHub raw fallback:*)"
+      "Bash(git commit -m \"Add Follow Your Nose HTTP import resolution with GitHub raw fallback:*)",
+      "Bash(git checkout:*)",
+      "Bash(git commit -m \"Convert frontend from Tauri to plain web app, add Railway deployment:*)"
     ],
     "deny": []
   },

@@ -6,6 +6,7 @@ RUN npm install && npm install @rollup/rollup-linux-x64-musl
 COPY index.html vite.config.js ./
 COPY js/ ./js/
 COPY main.js ./
+COPY public/ ./public/
 RUN npm run build
 
 # Stage 2: Python runtime

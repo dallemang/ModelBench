@@ -65,6 +65,17 @@ The `examples/FIBO_2025Q4/` directory contains the EDM Council's Financial Indus
 
 For a more manageable subset, try loading a single FIBO module such as `examples/FIBO_2025Q4/BE/SoleProprietorships/SoleProprietorships.ttl` -- OntoBench will pull in only its direct imports, giving you a smaller, more readable diagram.
 
+### Follow Your Nose (live web loading)
+
+OntoBench also supports loading ontologies directly from the web. Use **File > Load from URL...** and enter an ontology URI -- OntoBench will fetch it and recursively follow all `owl:imports` links automatically.
+
+FIBO publishes its ontologies as linked data, so you can load it live without the local example files:
+
+- **Subset (recommended to start):** `https://spec.edmcouncil.org/fibo/ontology/BE/SoleProprietorships/SoleProprietorships/`
+- **Full production release:** `https://spec.edmcouncil.org/fibo/ontology/AboutFIBOProd/`
+
+**Warning:** Loading the full FIBO via Follow Your Nose will trigger hundreds of individual HTTP downloads and may take several minutes to complete. Start with the subset URI to get a feel for the feature.
+
 ## Features
 
 ### Automatic Import Resolution

@@ -354,23 +354,70 @@ def resolve_relative_import_path(base_file_path, base_uri, import_uri):
     
     return resolved_path, None
 
-def load_imports_recursive(dataset, main_file_path, main_base_uri, loaded_uris=None):
-    """Recursively load imports for a dataset"""
-    
+def fetch_rdf_from_uri(uri, timeout=30):
+    """Fetch an RDF document from a URI via HTTP, returning (content, content_type, error).
+
+    Tries Turtle first, then RDF/XML as fallback, following redirects.
+    Returns (content_bytes, content_type_str, None) on success, or (None, None, error_str) on failure.
+    """
+    import requests
+
+    accept = "text/turtle, application/rdf+xml;q=0.9, application/n-triples;q=0.8, */*;q=0.5"
+    try:
+        response = requests.get(uri, headers={"Accept": accept}, timeout=timeout,
+                                allow_redirects=True)
+        response.raise_for_status()
+        content_type = response.headers.get("Content-Type", "").split(";")[0].strip()
+        return response.content, content_type, None
+    except requests.exceptions.Timeout:
+        return None, None, f"Timeout after {timeout}s fetching {uri}"
+    except requests.exceptions.ConnectionError as e:
+        return None, None, f"Connection error fetching {uri}: {e}"
+    except requests.exceptions.HTTPError as e:
+        return None, None, f"HTTP {e.response.status_code} fetching {uri}"
+    except Exception as e:
+        return None, None, f"Error fetching {uri}: {e}"
+
+
+def content_type_to_rdflib_format(content_type):
+    """Map HTTP Content-Type to rdflib format string."""
+    mapping = {
+        "text/turtle": "turtle",
+        "application/x-turtle": "turtle",
+        "application/rdf+xml": "xml",
+        "application/xml": "xml",
+        "text/xml": "xml",
+        "application/n-triples": "nt",
+        "text/plain": "nt",
+        "application/ld+json": "json-ld",
+    }
+    return mapping.get(content_type, "turtle")  # default guess: turtle
+
+
+def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None):
+    """Recursively load imports for a dataset.
+
+    main_source: file path (str) if loaded from disk, or None if loaded via HTTP.
+    main_base_uri: the ontology URI used as the named graph identifier.
+
+    When a local file is not found or the import is on a different domain,
+    falls back to fetching the import URI via HTTP (Follow Your Nose).
+    """
+
     if loaded_uris is None:
         loaded_uris = set()
-    
+
     # Avoid infinite loops
     if main_base_uri in loaded_uris:
         return []
-    
+
     loaded_uris.add(main_base_uri)
-    
+
     main_graph = dataset.graph(URIRef(main_base_uri))
     imports = find_owl_imports(main_graph)
-    
+
     import_results = []
-    
+
     for import_uri in imports:
         import_info = {
             "import_uri": import_uri,
@@ -380,80 +427,183 @@ def load_imports_recursive(dataset, main_file_path, main_base_uri, loaded_uris=N
             "error": None,
             "nested_imports": []
         }
-        
+
         try:
-            # Resolve relative path
-            resolved_path, error = resolve_relative_import_path(main_file_path, main_base_uri, import_uri)
-            
-            if error:
-                import_info["status"] = "skipped"
-                import_info["error"] = error
+            # Check if already loaded (by URI)
+            if import_uri in loaded_uris:
+                import_info["status"] = "already_loaded"
+                import_info["base_uri"] = import_uri
                 import_results.append(import_info)
                 continue
-            
-            # Check if file exists, trying common extensions if needed
-            actual_file_path = resolved_path
-            if not os.path.exists(resolved_path):
-                # Try common RDF file extensions
-                extensions_to_try = ['.ttl', '.rdf']
-                found = False
-                for ext in extensions_to_try:
-                    test_path = resolved_path + ext
-                    if os.path.exists(test_path):
-                        actual_file_path = test_path
-                        found = True
-                        break
-                
-                if not found:
-                    import_info["status"] = "file_not_found"
-                    import_info["error"] = f"File not found: {resolved_path} (tried extensions: {', '.join(extensions_to_try)})"
+
+            actual_file_path = None
+
+            # --- Step 1: Try local file resolution ---
+            if main_source is not None:
+                resolved_path, error = resolve_relative_import_path(main_source, main_base_uri, import_uri)
+                if not error:
+                    # Check if file exists, trying common extensions if needed
+                    if os.path.exists(resolved_path):
+                        actual_file_path = resolved_path
+                    else:
+                        for ext in ['.ttl', '.rdf']:
+                            test_path = resolved_path + ext
+                            if os.path.exists(test_path):
+                                actual_file_path = test_path
+                                break
+
+            # --- Step 2: Fall back to HTTP (Follow Your Nose) ---
+            if actual_file_path is None:
+                if import_uri.startswith("http://") or import_uri.startswith("https://"):
+                    print(f"FYN: fetching {import_uri}", file=sys.stderr)
+                    content, content_type, fetch_error = fetch_rdf_from_uri(import_uri)
+                    if fetch_error:
+                        import_info["status"] = "fetch_failed"
+                        import_info["error"] = fetch_error
+                        import_results.append(import_info)
+                        continue
+
+                    # Parse fetched content directly into dataset
+                    rdf_format = content_type_to_rdflib_format(content_type)
+                    import_graph = dataset.graph(URIRef(import_uri))
+                    import_graph.remove((None, None, None))
+                    import_graph.parse(data=content, format=rdf_format, publicID=import_uri)
+                    register_namespaces_from_graph(import_graph, f"(fetched: {import_uri})")
+
+                    import_info["status"] = "fetched"
+                    import_info["base_uri"] = import_uri
+                    import_info["triples_count"] = len(import_graph)
+
+                    # Recurse — source is None since there's no local file
+                    nested_imports = load_imports_recursive(dataset, None, import_uri, loaded_uris)
+                    import_info["nested_imports"] = nested_imports
                     import_results.append(import_info)
                     continue
-            
-            # Load the import file
+                else:
+                    import_info["status"] = "file_not_found"
+                    import_info["error"] = f"Not found locally and not an HTTP URI: {import_uri}"
+                    import_results.append(import_info)
+                    continue
+
+            # --- Load from local file ---
             import_info["file_path"] = actual_file_path
-            
-            # For now, assume the import URI is the base URI (as stated in requirements)
-            import_base_uri = import_uri
-            import_info["base_uri"] = import_base_uri
-            
-            # Check if already loaded
-            if import_base_uri in loaded_uris:
-                import_info["status"] = "already_loaded"
-                import_results.append(import_info)
-                continue
-            
-            # Parse into dataset - clear existing graph first if present
-            import_graph = dataset.graph(URIRef(import_base_uri))
-            import_graph.remove((None, None, None))  # Clear existing graph
+            import_info["base_uri"] = import_uri
+
+            import_graph = dataset.graph(URIRef(import_uri))
+            import_graph.remove((None, None, None))
             import_graph.parse(actual_file_path)
-            
-            # Register namespaces from the imported graph
             register_namespaces_from_graph(import_graph, f"(import: {actual_file_path})")
-            
+
             import_info["status"] = "loaded"
             import_info["triples_count"] = len(import_graph)
-            
-            
+
             # Recursively load nested imports
-            nested_imports = load_imports_recursive(dataset, actual_file_path, import_base_uri, loaded_uris)
+            nested_imports = load_imports_recursive(dataset, actual_file_path, import_uri, loaded_uris)
             import_info["nested_imports"] = nested_imports
-            
             import_results.append(import_info)
-            
+
         except Exception as e:
             import_info["status"] = "error"
             import_info["error"] = str(e)
             import_results.append(import_info)
-    
+
     return import_results
+
+def load_rdf_uri(uri):
+    """Load an RDF document from a URI (HTTP/HTTPS) into the dataset, following imports via FYN."""
+    global current_dataset, current_file_path, current_base_uri
+
+    print(f"DEBUG: load_rdf_uri called with: {uri}", file=sys.stderr)
+
+    try:
+        content, content_type, fetch_error = fetch_rdf_from_uri(uri)
+        if fetch_error:
+            return {"error": fetch_error}
+
+        if current_dataset is None:
+            clear_namespace_registry()
+            current_dataset = Dataset()
+
+        rdf_format = content_type_to_rdflib_format(content_type)
+        main_graph = current_dataset.graph(URIRef(uri))
+        main_graph.remove((None, None, None))
+        main_graph.parse(data=content, format=rdf_format, publicID=uri)
+
+        # Detect actual ontology URI from graph (may differ from request URI after redirects)
+        ontology_uris = list(main_graph.subjects(RDF.type, OWL.Ontology))
+        base_uri = str(ontology_uris[0]) if ontology_uris else uri
+
+        # If the ontology declares a different URI, re-key the graph
+        if base_uri != uri:
+            target_graph = current_dataset.graph(URIRef(base_uri))
+            target_graph.remove((None, None, None))
+            for triple in main_graph:
+                target_graph.add(triple)
+            current_dataset.remove_graph(URIRef(uri))
+            main_graph = target_graph
+
+        register_namespaces_from_graph(main_graph, f"(fetched: {uri})")
+
+        current_file_path = None   # no local file
+        current_base_uri = base_uri
+
+        print(f"DEBUG: Fetched {len(main_graph)} triples, base_uri={base_uri}", file=sys.stderr)
+
+        # Recursively follow imports via FYN (main_source=None → always HTTP)
+        import_results = load_imports_recursive(current_dataset, None, base_uri)
+
+        # Gather stats
+        classes, object_properties, datatype_properties = set(), set(), set()
+        for graph in current_dataset.graphs():
+            classes.update(s for s in graph.subjects(RDF.type, OWL.Class) if not isinstance(s, BNode))
+            classes.update(s for s in graph.subjects(RDF.type, RDFS.Class) if not isinstance(s, BNode))
+            object_properties.update(s for s in graph.subjects(RDF.type, OWL.ObjectProperty) if not isinstance(s, BNode))
+            datatype_properties.update(s for s in graph.subjects(RDF.type, OWL.DatatypeProperty) if not isinstance(s, BNode))
+
+        total_graphs = len(list(current_dataset.graphs()))
+        total_triples = sum(len(g) for g in current_dataset.graphs())
+
+        class_hierarchy = build_class_hierarchy_from_dataset(current_dataset)
+
+        return {
+            "success": True,
+            "file_path": uri,
+            "base_uri": base_uri,
+            "file_size": len(content),
+            "triples_count": len(main_graph),
+            "namespaces_count": len(global_namespaces),
+            "namespaces": global_namespaces,
+            "namespace_conflicts": namespace_conflicts,
+            "classes_count": len(classes),
+            "properties_count": len(object_properties) + len(datatype_properties),
+            "object_properties_count": len(object_properties),
+            "datatype_properties_count": len(datatype_properties),
+            "classes": [str(c) for c in list(classes)[:10]],
+            "properties": [str(p) for p in list(object_properties | datatype_properties)[:10]],
+            "class_hierarchy": class_hierarchy,
+            "imports": import_results,
+            "imports_count": len(import_results),
+            "loaded_graphs": [str(g.identifier) for g in current_dataset.graphs()],
+            "total_graphs": total_graphs,
+            "total_triples": total_triples,
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        return {"error": f"Failed to load RDF from URI: {str(e)}"}
+
 
 def load_rdf_file(file_path):
     """Load an RDF file into a dataset and return statistics"""
     global current_dataset, current_file_path, current_base_uri
     
     print(f"DEBUG: load_rdf_file called with: {file_path}", file=sys.stderr)
-    
+
+    # If given a URL, delegate to URI loader
+    if file_path.startswith("http://") or file_path.startswith("https://"):
+        return load_rdf_uri(file_path)
+
     try:
         if not os.path.exists(file_path):
             return {"error": "File does not exist"}

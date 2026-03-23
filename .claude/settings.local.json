@@ -5,7 +5,11 @@
       "Bash(mkdir:*)",
       "Bash(rg:*)",
       "Bash(npm run tauri:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git stash:*)",
+      "Bash(curl -L -H \"Accept: text/turtle, application/rdf+xml\" https://spec.edmcouncil.org/fibo/ontology/BE/LegalEntities/CorporateBodies/)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"Add Follow Your Nose \\(FYN\\) HTTP import resolution and Load from URL feature:*)"
     ],
     "deny": []
   },

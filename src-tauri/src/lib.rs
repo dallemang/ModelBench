@@ -14,6 +14,7 @@ struct LoadRdfRequest {
     file_path: String,
 }
 
+
 #[derive(Serialize, Deserialize)]
 struct QueryRequest {
     sparql_query: String,
@@ -279,8 +280,8 @@ pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_dialog::init())
     .invoke_handler(tauri::generate_handler![
-        load_rdf_file, 
-        get_graph_info, 
+        load_rdf_file,
+        get_graph_info,
         query_graph, 
         add_triple, 
         get_hierarchy,

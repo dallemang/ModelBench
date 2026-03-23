@@ -12,19 +12,22 @@ function renderImportDetails(imports, level = 0) {
   const indent = '  '.repeat(level);
   return imports.map(imp => `
     <div style="margin: 5px 0; margin-left: ${level * 20}px; padding: 8px; background: white; border-radius: 3px; border-left: 4px solid ${
-      imp.status === 'loaded' ? '#28a745' : 
+      imp.status === 'loaded' ? '#28a745' :
+      imp.status === 'fetched' ? '#6f42c1' :
       imp.status === 'already_loaded' ? '#17a2b8' :
       imp.status === 'skipped' ? '#ffc107' :
       imp.status === 'file_not_found' ? '#fd7e14' : '#dc3545'
     };">
-      <strong>${imp.import_uri}</strong> 
+      <strong>${imp.import_uri}</strong>
       <span style="color: ${
-        imp.status === 'loaded' ? '#28a745' : 
+        imp.status === 'loaded' ? '#28a745' :
+        imp.status === 'fetched' ? '#6f42c1' :
         imp.status === 'already_loaded' ? '#17a2b8' :
         imp.status === 'skipped' ? '#856404' :
         imp.status === 'file_not_found' ? '#fd7e14' : '#721c24'
       }; font-weight: bold;">[${imp.status.toUpperCase().replace('_', ' ')}]</span>
       ${imp.file_path ? `<br><small>File: ${imp.file_path}</small>` : ''}
+      ${imp.status === 'fetched' ? `<br><small>Source: web (Follow Your Nose)</small>` : ''}
       ${imp.triples_count ? `<br><small>Triples: ${imp.triples_count}</small>` : ''}
       ${imp.error ? `<br><small style="color: #dc3545;">Error: ${imp.error}</small>` : ''}
       ${imp.nested_imports && imp.nested_imports.length > 0 ? `
@@ -45,7 +48,7 @@ function flattenImportResults(imports) {
   
   for (const imp of imports) {
     // Only include loaded, skipped, and error statuses
-    if (imp.status === 'loaded' || imp.status === 'skipped' || imp.status === 'error') {
+    if (['loaded', 'fetched', 'skipped', 'error', 'fetch_failed', 'file_not_found'].includes(imp.status)) {
       flattened.push({
         import_uri: imp.import_uri,
         status: imp.status,
@@ -149,6 +152,116 @@ async function detectBackendPort() {
 
 // Function to handle file loading
 // extra
+async function handleLoadResponse(response, source) {
+  const graphStats = document.getElementById('graph-stats');
+  if (response.error) {
+    graphStats.innerHTML = `
+      <div style="color: #dc3545; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 15px;">
+        <strong>Error loading:</strong> ${source}<br>
+        <strong>Error:</strong> ${response.error}
+      </div>
+    `;
+    return;
+  }
+  if (!response.success) return;
+
+  document.getElementById('tab-container').style.display = 'block';
+
+  graphStats.innerHTML = `
+    <div style="padding: 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; margin-bottom: 15px; color: #155724;">
+      <strong>✓ Successfully loaded:</strong> ${source}<br>
+      <strong>Base URI:</strong> ${response.base_uri}<br>
+      <strong>Main file triples:</strong> ${response.triples_count}<br>
+      ${response.total_graphs && response.total_triples ? `<strong>Total dataset:</strong> ${response.total_graphs} graphs, ${response.total_triples} triples` : ''}
+    </div>
+
+    <h3>Graph Statistics</h3>
+    <div class="stats-grid">
+      <div><strong>Triples:</strong> ${response.triples_count}</div>
+      <div><strong>Subjects:</strong> ${response.subjects_count}</div>
+      <div><strong>Predicates:</strong> ${response.predicates_count}</div>
+      <div><strong>Objects:</strong> ${response.objects_count}</div>
+      <div><strong>Classes:</strong> ${response.classes_count}</div>
+      <div><strong>Object Properties:</strong> ${response.object_properties_count}</div>
+      <div><strong>Datatype Properties:</strong> ${response.datatype_properties_count}</div>
+      <div><strong>Total Properties:</strong> ${response.properties_count}</div>
+      <div><strong>Namespaces:</strong> ${response.namespaces_count}</div>
+      <div><strong>File Size:</strong> ${(response.file_size / 1024).toFixed(1)} KB</div>
+    </div>
+    ${response.namespaces_count > 0 ? `
+      <h4>Namespaces</h4>
+      <div class="namespaces">
+        ${Object.entries(response.namespaces).map(([prefix, uri]) =>
+          `<div><code>${prefix || '(default)'}</code>: ${uri}</div>`
+        ).join('')}
+      </div>
+    ` : ''}
+    ${response.namespace_conflicts && response.namespace_conflicts.length > 0 ? `
+      <h4 style="color: #dc3545;">⚠ Namespace Conflicts</h4>
+      <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px; margin: 10px 0;">
+        ${response.namespace_conflicts.map(conflict =>
+          `<div style="color: #721c24; margin: 5px 0; font-family: monospace; font-size: 13px;"><strong>WARNING:</strong> ${conflict}</div>`
+        ).join('')}
+      </div>
+    ` : ''}
+    ${response.classes && response.classes.length > 0 ? `
+      <h4>Sample Classes</h4>
+      <div class="classes">
+        ${response.classes.map(cls => `<div><code>${cls}</code></div>`).join('')}
+      </div>
+    ` : ''}
+    ${response.properties && response.properties.length > 0 ? `
+      <h4>Sample Properties</h4>
+      <div class="properties">
+        ${response.properties.map(prop => `<div><code>${prop}</code></div>`).join('')}
+      </div>
+    ` : ''}
+    ${response.hierarchy_debug ? `
+      <h4>Hierarchy Debug Info</h4>
+      <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 10px 0;">
+        <strong>Subclass relationships found:</strong> ${response.subclass_relationships_count}<br>
+        <strong>Full hierarchy tree:</strong>
+        <pre style="font-family: monospace; font-size: 12px; margin: 10px 0; white-space: pre;">${response.hierarchy_debug.full_hierarchy_tree.join('\n')}</pre>
+      </div>
+    ` : ''}
+    ${response.imports && response.imports.length > 0 ? `
+      <h4>Imports (${response.imports_count})</h4>
+      <div style="background: #e7f3ff; padding: 10px; border-radius: 4px; margin: 10px 0;">
+        <strong>Loaded Graphs:</strong> ${response.loaded_graphs ? response.loaded_graphs.length : 0}<br>
+        ${response.loaded_graphs ? `
+          <div style="margin: 10px 0;">
+            ${response.loaded_graphs.map(graph => `<div><code>${graph}</code></div>`).join('')}
+          </div>
+        ` : ''}
+        <strong>Import Details:</strong>
+        <div style="margin: 10px 0;">
+          ${renderImportDetails(response.imports)}
+        </div>
+      </div>
+    ` : ''}
+
+    <h4>Raw Response</h4>
+    <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px;">${JSON.stringify(response, null, 2)}</pre>
+  `;
+
+  setTreeState({}, response.namespaces || {});
+
+  const importsTableContainer = document.getElementById('imports-table-container');
+  if (importsTableContainer) {
+    importsTableContainer.innerHTML = buildImportsTable(response.imports);
+  }
+
+  await buildHierarchyFromBackend();
+
+  try {
+    await buildImportHierarchyFromBackend();
+  } catch (error) {
+    console.error('Import hierarchy failed, but continuing:', error);
+  }
+
+  switchTab('hierarchy');
+}
+
 async function loadFile() {
   try {
     const selected = await open({
@@ -182,125 +295,10 @@ async function loadFile() {
         const response = await invoke('load_rdf_file', {
           filePath: selected
         });
-        
+
         console.log('Python response:', response);
-        
-        if (response.error) {
-          // Show error in log tab
-          graphStats.innerHTML = `
-            <div style="color: #dc3545; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 15px;">
-              <strong>Error loading file:</strong> ${selected}<br>
-              <strong>Error:</strong> ${response.error}
-            </div>
-          `;
-        } else if (response.success) {
-          // Show tab container
-          document.getElementById('tab-container').style.display = 'block';
-          
-          // Populate Log tab with file info and detailed stats
-          const graphStats = document.getElementById('graph-stats');
-          graphStats.innerHTML = `
-            <div style="padding: 15px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; margin-bottom: 15px; color: #155724;">
-              <strong>✓ Successfully loaded:</strong> ${selected}<br>
-              <strong>Base URI:</strong> ${response.base_uri}<br>
-              <strong>Main file triples:</strong> ${response.triples_count}<br>
-              ${response.total_graphs && response.total_triples ? `<strong>Total dataset:</strong> ${response.total_graphs} graphs, ${response.total_triples} triples` : ''}
-            </div>
-            
-            <h3>Graph Statistics</h3>
-            <div class="stats-grid">
-              <div><strong>Triples:</strong> ${response.triples_count}</div>
-              <div><strong>Subjects:</strong> ${response.subjects_count}</div>
-              <div><strong>Predicates:</strong> ${response.predicates_count}</div>
-              <div><strong>Objects:</strong> ${response.objects_count}</div>
-              <div><strong>Classes:</strong> ${response.classes_count}</div>
-              <div><strong>Object Properties:</strong> ${response.object_properties_count}</div>
-              <div><strong>Datatype Properties:</strong> ${response.datatype_properties_count}</div>
-              <div><strong>Total Properties:</strong> ${response.properties_count}</div>
-              <div><strong>Namespaces:</strong> ${response.namespaces_count}</div>
-              <div><strong>File Size:</strong> ${(response.file_size / 1024).toFixed(1)} KB</div>
-            </div>
-            ${response.namespaces_count > 0 ? `
-              <h4>Namespaces</h4>
-              <div class="namespaces">
-                ${Object.entries(response.namespaces).map(([prefix, uri]) => 
-                  `<div><code>${prefix || '(default)'}</code>: ${uri}</div>`
-                ).join('')}
-              </div>
-            ` : ''}
-            ${response.namespace_conflicts && response.namespace_conflicts.length > 0 ? `
-              <h4 style="color: #dc3545;">⚠ Namespace Conflicts</h4>
-              <div style="background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px; margin: 10px 0;">
-                ${response.namespace_conflicts.map(conflict => 
-                  `<div style="color: #721c24; margin: 5px 0; font-family: monospace; font-size: 13px;"><strong>WARNING:</strong> ${conflict}</div>`
-                ).join('')}
-              </div>
-            ` : ''}
-            ${response.classes && response.classes.length > 0 ? `
-              <h4>Sample Classes</h4>
-              <div class="classes">
-                ${response.classes.map(cls => `<div><code>${cls}</code></div>`).join('')}
-              </div>
-            ` : ''}
-            ${response.properties && response.properties.length > 0 ? `
-              <h4>Sample Properties</h4>
-              <div class="properties">
-                ${response.properties.map(prop => `<div><code>${prop}</code></div>`).join('')}
-              </div>
-            ` : ''}
-            
-            ${response.hierarchy_debug ? `
-              <h4>Hierarchy Debug Info</h4>
-              <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin: 10px 0;">
-                <strong>Subclass relationships found:</strong> ${response.subclass_relationships_count}<br>
-                <strong>Full hierarchy tree:</strong>
-                <pre style="font-family: monospace; font-size: 12px; margin: 10px 0; white-space: pre;">${response.hierarchy_debug.full_hierarchy_tree.join('\n')}</pre>
-              </div>
-            ` : ''}
-            
-            ${response.imports && response.imports.length > 0 ? `
-              <h4>Imports (${response.imports_count})</h4>
-              <div style="background: #e7f3ff; padding: 10px; border-radius: 4px; margin: 10px 0;">
-                <strong>Loaded Graphs:</strong> ${response.loaded_graphs ? response.loaded_graphs.length : 0}<br>
-                ${response.loaded_graphs ? `
-                  <div style="margin: 10px 0;">
-                    ${response.loaded_graphs.map(graph => `<div><code>${graph}</code></div>`).join('')}
-                  </div>
-                ` : ''}
-                <strong>Import Details:</strong>
-                <div style="margin: 10px 0;">
-                  ${renderImportDetails(response.imports)}
-                </div>
-              </div>
-            ` : ''}
-            
-            <h4>Raw Response</h4>
-            <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px;">${JSON.stringify(response, null, 2)}</pre>
-          `;
-          
-          // Store namespaces and update tree state
-          const namespaces = response.namespaces || {};
-          setTreeState({}, namespaces);
-          
-          // Populate imports table
-          const importsTableContainer = document.getElementById('imports-table-container');
-          if (importsTableContainer) {
-            importsTableContainer.innerHTML = buildImportsTable(response.imports);
-          }
-          
-          // Now build the hierarchy and diagram by querying the backend
-          await buildHierarchyFromBackend();
-          
-          // Build import hierarchy but don't let it block the main flow
-          try {
-            await buildImportHierarchyFromBackend();
-          } catch (error) {
-            console.error('Import hierarchy failed, but continuing:', error);
-          }
-          
-          // Ensure we start on the hierarchy tab
-          switchTab('hierarchy');
-        }
+
+        await handleLoadResponse(response, selected);
         
       } catch (error) {
         console.error('Error calling Python backend:', error);
@@ -372,6 +370,30 @@ async function closeDataset() {
   } catch (error) {
     console.error('Error closing dataset:', error);
     alert('Error closing dataset: ' + error);
+  }
+}
+
+async function loadFromUrl() {
+  const uri = prompt('Enter the URI of an RDF ontology to load:');
+  if (!uri || !uri.trim()) return;
+  const trimmed = uri.trim();
+
+  resetViewportState();
+  const graphStats = document.getElementById('graph-stats');
+  graphStats.innerHTML = `<p>Fetching: ${trimmed}...</p>`;
+  document.getElementById('tab-container').style.display = 'block';
+  switchTab('log');
+
+  try {
+    const response = await invoke('load_rdf_file', { filePath: trimmed });
+    await handleLoadResponse(response, trimmed);
+  } catch (error) {
+    graphStats.innerHTML = `
+      <div style="color: #dc3545; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 15px;">
+        <strong>Error loading URI:</strong> ${trimmed}<br>
+        <strong>Error:</strong> ${error}
+      </div>
+    `;
   }
 }
 
@@ -460,6 +482,7 @@ function onClassSearch(query) {
 
 // Make functions globally available for HTML onclick handlers
 window.loadFile = loadFile;
+window.loadFromUrl = loadFromUrl;
 window.closeDataset = closeDataset;
 window.toggleNode = toggleNode;
 window.switchTab = switchTab;

@@ -1,7 +1,7 @@
 # Stage 1: build the frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
-COPY package*.json ./
+COPY package.json ./
 RUN npm install
 COPY index.html vite.config.js ./
 COPY js/ ./js/

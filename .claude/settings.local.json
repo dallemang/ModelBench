@@ -9,7 +9,9 @@
       "Bash(git stash:*)",
       "Bash(curl -L -H \"Accept: text/turtle, application/rdf+xml\" https://spec.edmcouncil.org/fibo/ontology/BE/LegalEntities/CorporateBodies/)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"Add Follow Your Nose \\(FYN\\) HTTP import resolution and Load from URL feature:*)"
+      "Bash(git commit -m \"Add Follow Your Nose \\(FYN\\) HTTP import resolution and Load from URL feature:*)",
+      "Bash(git push:*)",
+      "Bash(git commit -m \"Add Follow Your Nose HTTP import resolution with GitHub raw fallback:*)"
     ],
     "deny": []
   },

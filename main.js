@@ -27,7 +27,7 @@ function renderImportDetails(imports, level = 0) {
         imp.status === 'file_not_found' ? '#fd7e14' : '#721c24'
       }; font-weight: bold;">[${imp.status.toUpperCase().replace('_', ' ')}]</span>
       ${imp.file_path ? `<br><small>File: ${imp.file_path}</small>` : ''}
-      ${imp.status === 'fetched' ? `<br><small>Source: web (Follow Your Nose)</small>` : ''}
+      ${imp.fetch_url ? `<br><small>Fetched from: ${imp.fetch_url}</small>` : ''}
       ${imp.triples_count ? `<br><small>Triples: ${imp.triples_count}</small>` : ''}
       ${imp.error ? `<br><small style="color: #dc3545;">Error: ${imp.error}</small>` : ''}
       ${imp.nested_imports && imp.nested_imports.length > 0 ? `

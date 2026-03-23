@@ -76,6 +76,10 @@ FIBO publishes its ontologies as linked data, so you can load it live without th
 
 **Warning:** Loading the full FIBO via Follow Your Nose will trigger hundreds of individual HTTP downloads and may take several minutes to complete. Start with the subset URI to get a feel for the feature.
 
+When a server returns HTML instead of RDF (i.e. doesn't support content negotiation), OntoBench falls back to a FYN heuristic that tries to resolve imports relative to the original fetch URL. This works in some cases -- CDMC is one of them. Load it live with:
+
+`https://raw.githubusercontent.com/edmcouncil/cdmc/refs/heads/main/ontology/AboutCDMC.ttl`
+
 ## Features
 
 ### Automatic Import Resolution

@@ -2,7 +2,7 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY package.json ./
-RUN npm install --omit=optional
+RUN npm install && npm install @rollup/rollup-linux-x64-musl
 COPY index.html vite.config.js ./
 COPY js/ ./js/
 COPY main.js ./

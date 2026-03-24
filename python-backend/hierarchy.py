@@ -95,8 +95,12 @@ def get_class_properties(graph, class_uri):
     if isinstance(class_uri, str):
         class_uri = URIRef(class_uri)
     
-    # Find all properties where this class is the domain
+    # Find all object properties where this class is the domain
+    # (owl:DatatypeProperty is intentionally excluded — datatype ranges
+    #  are not meaningful as graph edges between classes)
     for prop in graph.subjects(RDFS.domain, class_uri):
+        if (prop, RDF.type, OWL.ObjectProperty) not in graph:
+            continue
         prop_info = {
             "uri": str(prop),
             "label": get_label(graph, prop),

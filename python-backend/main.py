@@ -326,6 +326,8 @@ def build_ontology_uri_map(temp_dir):
                 if uri:
                     uri_map[uri] = fpath
     print(f"URI map: built {len(uri_map)} entries", file=sys.stderr)
+    for uri, path in list(uri_map.items())[:5]:
+        print(f"  URI map sample: {uri} → {os.path.basename(path)}", file=sys.stderr)
     return uri_map
 
 
@@ -561,9 +563,12 @@ def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None
             actual_file_path = None
 
             # --- Step 0: URI map lookup (directory upload) ---
-            if uri_map and import_uri in uri_map:
-                actual_file_path = uri_map[import_uri]
-                print(f"URI map hit: {import_uri} → {actual_file_path}", file=sys.stderr)
+            if uri_map:
+                if import_uri in uri_map:
+                    actual_file_path = uri_map[import_uri]
+                    print(f"URI map hit: {import_uri} → {os.path.basename(actual_file_path)}", file=sys.stderr)
+                else:
+                    print(f"URI map miss: {import_uri}", file=sys.stderr)
 
             # --- Step 1: Local file resolution ---
             if actual_file_path is None and main_source is not None:

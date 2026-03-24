@@ -296,6 +296,58 @@ def load_into_dataset_with_base_detection(file_path, target_dataset=None):
 
 
 
+def extract_ontology_uri_from_file(file_path):
+    """Quick regex scan for owl:Ontology URI — avoids full parse for speed."""
+    try:
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read(50000)
+        # Turtle: <URI> a owl:Ontology  or  <URI> rdf:type owl:Ontology
+        m = re.search(r'<([^>]+)>\s+(?:a\s+owl:Ontology|rdf:type\s+owl:Ontology)', content)
+        if m:
+            return m.group(1)
+        # RDF/XML: <owl:Ontology rdf:about="URI"
+        m = re.search(r'<owl:Ontology[^>]*rdf:about=["\']([^"\']+)["\']', content)
+        if m:
+            return m.group(1)
+    except Exception as e:
+        print(f"Warning: could not extract ontology URI from {file_path}: {e}", file=sys.stderr)
+    return None
+
+
+def build_ontology_uri_map(temp_dir):
+    """Scan all RDF files in temp_dir and return {ontology_uri → file_path}."""
+    uri_map = {}
+    rdf_extensions = {'.ttl', '.owl', '.rdf', '.n3', '.nt'}
+    for root, dirs, files in os.walk(temp_dir):
+        for fname in files:
+            if os.path.splitext(fname)[1].lower() in rdf_extensions:
+                fpath = os.path.join(root, fname)
+                uri = extract_ontology_uri_from_file(fpath)
+                if uri:
+                    uri_map[uri] = fpath
+    print(f"URI map: built {len(uri_map)} entries", file=sys.stderr)
+    return uri_map
+
+
+def find_entry_point(temp_dir):
+    """Find core/ontology.ttl anywhere in the directory tree."""
+    for root, dirs, files in os.walk(temp_dir):
+        if os.path.basename(root).lower() == 'core' and 'ontology.ttl' in files:
+            candidate = os.path.join(root, 'ontology.ttl')
+            print(f"Entry point: {candidate}", file=sys.stderr)
+            return candidate
+    return None
+
+
+def load_rdf_directory(temp_dir):
+    """Load an ontology from an uploaded directory tree."""
+    entry_file = find_entry_point(temp_dir)
+    if entry_file is None:
+        return {"error": "No entry point found — expected a directory named 'core' containing 'ontology.ttl'"}
+    uri_map = build_ontology_uri_map(temp_dir)
+    return load_rdf_file(entry_file, uri_map=uri_map)
+
+
 def find_owl_imports(graph):
     """Find all owl:imports statements in the graph"""
     imports = []
@@ -458,15 +510,17 @@ def content_type_to_rdflib_format(content_type, url=None):
     return "turtle"  # default guess
 
 
-def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None, fetch_url=None):
+def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None, fetch_url=None, uri_map=None):
     """Recursively load imports for a dataset.
 
     main_source: file path (str) if loaded from disk, or None if loaded via HTTP.
     main_base_uri: the ontology URI used as the named graph identifier.
     fetch_url: the actual URL used to fetch main_base_uri (may differ from
                main_base_uri when loaded via a mirror like GitHub raw).
+    uri_map: {ontology_uri → local_file_path} built from uploaded directory.
 
     Resolution order for each owl:imports URI:
+      0. URI map lookup — local file whose owl:Ontology IRI matches (directory upload)
       1. Local file relative to main_source (if main_source is a file path)
       2. Follow Your Nose — fetch import_uri directly via HTTP
       3. If FYN fails and fetch_url is set — resolve import relative to fetch_url
@@ -506,8 +560,13 @@ def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None
 
             actual_file_path = None
 
+            # --- Step 0: URI map lookup (directory upload) ---
+            if uri_map and import_uri in uri_map:
+                actual_file_path = uri_map[import_uri]
+                print(f"URI map hit: {import_uri} → {actual_file_path}", file=sys.stderr)
+
             # --- Step 1: Local file resolution ---
-            if main_source is not None:
+            if actual_file_path is None and main_source is not None:
                 resolved_path, error = resolve_relative_import_path(main_source, main_base_uri, import_uri)
                 if not error:
                     if os.path.exists(resolved_path):
@@ -533,7 +592,7 @@ def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None
                 import_info["triples_count"] = len(import_graph)
 
                 nested_imports = load_imports_recursive(
-                    dataset, actual_file_path, import_uri, loaded_uris)
+                    dataset, actual_file_path, import_uri, loaded_uris, uri_map=uri_map)
                 import_info["nested_imports"] = nested_imports
                 import_results.append(import_info)
                 continue
@@ -582,7 +641,7 @@ def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None
             import_info["triples_count"] = len(import_graph)
 
             nested_imports = load_imports_recursive(
-                dataset, None, import_uri, loaded_uris, fetch_url=actual_fetch_url)
+                dataset, None, import_uri, loaded_uris, fetch_url=actual_fetch_url, uri_map=uri_map)
             import_info["nested_imports"] = nested_imports
             import_results.append(import_info)
 
@@ -678,7 +737,7 @@ def load_rdf_uri(uri):
         return {"error": f"Failed to load RDF from URI: {str(e)}"}
 
 
-def load_rdf_file(file_path):
+def load_rdf_file(file_path, uri_map=None):
     """Load an RDF file into a dataset and return statistics"""
     global current_dataset, current_file_path, current_base_uri
     
@@ -737,7 +796,7 @@ def load_rdf_file(file_path):
         
         # Load imports recursively first so we have the full dataset
         print(f"Loading imports for {base_uri}...", file=sys.stderr)
-        import_results = load_imports_recursive(dataset, file_path, base_uri)
+        import_results = load_imports_recursive(dataset, file_path, base_uri, uri_map=uri_map)
         
         # Now count classes and properties from all graphs in the dataset
         for graph in dataset.graphs():

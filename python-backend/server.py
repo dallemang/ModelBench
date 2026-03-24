@@ -10,7 +10,8 @@ import re
 import uuid
 from typing import Optional, List
 import tempfile
-from fastapi import FastAPI, HTTPException, UploadFile, File
+import shutil
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -31,6 +32,7 @@ from main import (
     register_namespaces_from_graph,
     get_global_namespaces,
     load_rdf_file,
+    load_rdf_directory,
     get_graph_info,
     query_graph,
     build_ontology_context_for_ai,
@@ -132,6 +134,35 @@ async def upload_rdf_file_endpoint(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         os.unlink(tmp_path)
+
+@app.post("/upload_directory")
+async def upload_directory_endpoint(
+    files: List[UploadFile] = File(...),
+    paths: List[str] = Form(...)
+):
+    """Load an ontology from a directory uploaded by the browser.
+
+    The browser sends each file under the key 'files' and the corresponding
+    webkitRelativePath under the key 'paths', preserving the directory tree.
+    """
+    temp_dir = tempfile.mkdtemp()
+    try:
+        for file, rel_path in zip(files, paths):
+            dest = os.path.join(temp_dir, rel_path)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with open(dest, 'wb') as f:
+                f.write(await file.read())
+        result = load_rdf_directory(temp_dir)
+        if "error" in result:
+            raise HTTPException(status_code=400, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
 
 @app.get("/graph_info")
 def get_graph_info_endpoint():

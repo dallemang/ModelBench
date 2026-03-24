@@ -261,6 +261,54 @@ async function handleLoadResponse(response, source) {
   switchTab('hierarchy');
 }
 
+async function loadDirectory() {
+  let input = document.getElementById('rdf-dir-input');
+  if (!input) {
+    input = document.createElement('input');
+    input.type = 'file';
+    input.id = 'rdf-dir-input';
+    input.webkitdirectory = true;
+    input.multiple = true;
+    input.style.display = 'none';
+    document.body.appendChild(input);
+  }
+
+  input.onchange = async () => {
+    const files = Array.from(input.files);
+    input.value = '';
+    if (files.length === 0) return;
+
+    const dirName = files[0].webkitRelativePath.split('/')[0];
+    resetViewportState();
+    const graphStats = document.getElementById('graph-stats');
+    graphStats.innerHTML = `<p>Uploading directory: ${dirName} (${files.length} files)...</p>`;
+    document.getElementById('tab-container').style.display = 'block';
+    switchTab('log');
+
+    try {
+      const form = new FormData();
+      for (const file of files) {
+        form.append('files', file);
+        form.append('paths', file.webkitRelativePath);
+      }
+      const res = await fetch(BACKEND + '/upload_directory', { method: 'POST', body: form });
+      const data = await res.json().catch(() => ({ error: res.statusText }));
+      if (!res.ok) throw new Error(data.detail || data.error || res.statusText);
+      await handleLoadResponse(data, dirName);
+    } catch (error) {
+      graphStats.innerHTML = `
+        <div style="color: #dc3545; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 4px; margin-bottom: 15px;">
+          <strong>Backend Error:</strong> ${error}
+        </div>
+      `;
+      document.getElementById('tab-container').style.display = 'block';
+      switchTab('log');
+    }
+  };
+
+  input.click();
+}
+
 async function loadFile() {
   // Trigger hidden file input
   let input = document.getElementById('rdf-file-input');

@@ -297,23 +297,30 @@ def load_into_dataset_with_base_detection(file_path, target_dataset=None):
 
 
 def extract_ontology_uri_from_file(file_path):
-    """Quick regex scan for owl:Ontology URI — avoids full parse for speed."""
+    """Extract the URI that identifies this file, for the URI map.
+
+    Priority:
+      1. @base declaration (most common in OWL Turtle files, present regardless
+         of whether owl:Ontology is declared)
+      2. Full-URI owl:Ontology subject in Turtle
+      3. rdf:about on owl:Ontology in RDF/XML
+    """
+    # 1. @base is the authoritative self-identifier for Turtle ontology files
+    base = scan_for_base_declaration(file_path)
+    if base:
+        return base
+
     try:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read(50000)
-        # Turtle: <URI> a owl:Ontology  (full URI form)
+        # 2. Turtle: <URI> a owl:Ontology
         m = re.search(r'<([^>]+)>\s+(?:a\s+owl:Ontology|rdf:type\s+owl:Ontology)', content)
         if m:
             return m.group(1)
-        # RDF/XML: <owl:Ontology rdf:about="URI"
+        # 3. RDF/XML: <owl:Ontology rdf:about="URI"
         m = re.search(r'<owl:Ontology[^>]*rdf:about=["\']([^"\']+)["\']', content)
         if m:
             return m.group(1)
-        # Turtle: <> a owl:Ontology  (relative URI — resolve against @base)
-        if re.search(r'<>\s+(?:a\s+owl:Ontology|rdf:type\s+owl:Ontology)', content):
-            base = scan_for_base_declaration(file_path)
-            if base:
-                return base.rstrip('/#')  # normalise trailing slash for lookup
     except Exception as e:
         print(f"Warning: could not extract ontology URI from {file_path}: {e}", file=sys.stderr)
     return None
@@ -576,8 +583,12 @@ def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None
 
             # --- Step 0: URI map lookup (directory upload) ---
             if uri_map:
-                if import_uri in uri_map:
-                    actual_file_path = uri_map[import_uri]
+                # Try exact match, then with/without trailing slash
+                _hit = (uri_map.get(import_uri)
+                        or uri_map.get(import_uri.rstrip('/'))
+                        or uri_map.get(import_uri + '/'))
+                if _hit:
+                    actual_file_path = _hit
                     import_info["resolution"] = "uri_map"
                     print(f"URI map hit: {import_uri} → {os.path.basename(actual_file_path)}", file=sys.stderr)
                 else:

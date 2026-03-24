@@ -95,10 +95,14 @@ export function buildCytoscapeDataWithRings(hierarchy) {
     if (propertiesProcessed.has(node.uri)) return;
     propertiesProcessed.add(node.uri);
 
-    // Add property edges (solid lines)
+    // Add property edges (solid lines) — skip datatype/XSD ranges
+    const DATATYPE_NS = ['http://www.w3.org/2001/XMLSchema#',
+                         'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+                         'http://www.w3.org/2000/01/rdf-schema#'];
     if (node.properties && node.properties.length > 0) {
       node.properties.forEach(prop => {
         prop.ranges.forEach(range => {
+          if (DATATYPE_NS.some(ns => range.uri.startsWith(ns))) return;
           edges.push({
             data: {
               id: `property_${node.uri}_${range.uri}_${prop.uri}`,

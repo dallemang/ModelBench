@@ -8,6 +8,16 @@ import re
 from rdflib import BNode, Literal
 from rdflib.namespace import RDF, RDFS, OWL
 
+# Namespaces whose terms are datatypes, not classes — suppress from hierarchy and graph
+_DATATYPE_NAMESPACES = (
+    'http://www.w3.org/2001/XMLSchema#',
+    'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+    'http://www.w3.org/2000/01/rdf-schema#',
+)
+
+def _is_datatype_uri(uri_str):
+    return any(uri_str.startswith(ns) for ns in _DATATYPE_NAMESPACES)
+
 
 def guess_namespace_and_label(uri_str):
     """Extract a namespace URI and a human-readable label from an external class URI.
@@ -302,8 +312,9 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
             s for s, _, _, _ in dataset.quads((None, RDF.type, entity_type, None))
         }
 
-        # Filter out blank nodes and deprecated entities
+        # Filter out blank nodes, deprecated entities, and built-in datatype URIs
         non_blank_entities = {ent for ent in dataset_entities if not isinstance(ent, BNode)}
+        non_blank_entities = {ent for ent in non_blank_entities if not _is_datatype_uri(str(ent))}
         non_deprecated_entities = {ent for ent in non_blank_entities if not is_deprecated(dataset, ent)}
         
         all_entities.update(non_deprecated_entities)
@@ -381,8 +392,11 @@ def build_hierarchy(dataset, types, rel, object_on_top=True):
         if related_entities:
             pass
         
-        # Filter out owl:Thing and blank nodes
-        meaningful_related = [r for r in related_entities if str(r) != str(OWL.Thing) and not isinstance(r, BNode)]
+        # Filter out owl:Thing, blank nodes, and built-in datatype URIs
+        meaningful_related = [r for r in related_entities
+                              if str(r) != str(OWL.Thing)
+                              and not isinstance(r, BNode)
+                              and not _is_datatype_uri(str(r))]
         
         if meaningful_related:
             # Traditional hierarchy: objects are parents of subjects

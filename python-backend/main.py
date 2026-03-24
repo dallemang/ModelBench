@@ -347,7 +347,10 @@ def load_rdf_directory(temp_dir):
     if entry_file is None:
         return {"error": "No entry point found — expected a directory named 'core' containing 'ontology.ttl'"}
     uri_map = build_ontology_uri_map(temp_dir)
-    return load_rdf_file(entry_file, uri_map=uri_map)
+    result = load_rdf_file(entry_file, uri_map=uri_map)
+    result['uri_map_size'] = len(uri_map)
+    result['uri_map_sample'] = list(uri_map.keys())[:10]
+    return result
 
 
 def find_owl_imports(graph):
@@ -546,6 +549,7 @@ def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None
         import_info = {
             "import_uri": import_uri,
             "status": "pending",
+            "resolution": None,
             "file_path": None,
             "fetch_url": None,
             "base_uri": None,
@@ -566,6 +570,7 @@ def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None
             if uri_map:
                 if import_uri in uri_map:
                     actual_file_path = uri_map[import_uri]
+                    import_info["resolution"] = "uri_map"
                     print(f"URI map hit: {import_uri} → {os.path.basename(actual_file_path)}", file=sys.stderr)
                 else:
                     print(f"URI map miss: {import_uri}", file=sys.stderr)
@@ -585,6 +590,8 @@ def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None
 
             if actual_file_path is not None:
                 # --- Load from local file ---
+                if import_info["resolution"] is None:
+                    import_info["resolution"] = "local_file"
                 import_info["file_path"] = actual_file_path
                 import_info["base_uri"] = import_uri
 
@@ -641,6 +648,7 @@ def load_imports_recursive(dataset, main_source, main_base_uri, loaded_uris=None
             register_namespaces_from_graph(import_graph, f"(fetched: {actual_fetch_url})")
 
             import_info["status"] = "fetched"
+            import_info["resolution"] = "url_heuristic" if actual_fetch_url != import_uri else "fyn"
             import_info["fetch_url"] = actual_fetch_url
             import_info["base_uri"] = import_uri
             import_info["triples_count"] = len(import_graph)

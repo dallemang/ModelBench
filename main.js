@@ -86,28 +86,41 @@ function buildImportsTable(importResults) {
     `;
   }
   
+  const resolutionLabel = {
+    uri_map: { text: 'URI map', color: '#155724', bg: '#d4edda' },
+    local_file: { text: 'local file', color: '#004085', bg: '#cce5ff' },
+    fyn: { text: 'FYN', color: '#6f42c1', bg: '#e8d5ff' },
+    url_heuristic: { text: 'URL heuristic', color: '#856404', bg: '#fff3cd' },
+  };
+
   const tableRows = flatImports.map(imp => {
-    const isError = imp.status === 'error';
+    const isError = imp.status === 'error' || imp.status === 'fetch_failed';
     const uriStyle = isError ? 'color: #dc3545; font-weight: bold;' : '';
     const tooltip = isError && imp.error ? `title="${imp.error}"` : '';
-    
+    const res = imp.resolution && resolutionLabel[imp.resolution];
+    const resCell = res
+      ? `<span style="font-size:11px; padding:1px 5px; border-radius:3px; background:${res.bg}; color:${res.color};">${res.text}</span>`
+      : (imp.status === 'fetch_failed' ? `<span style="font-size:11px; color:#dc3545;">failed</span>` : '');
+
     return `
       <tr>
         <td class="uri-cell" style="${uriStyle}" ${tooltip}>
           ${imp.import_uri}
         </td>
-        <td class="file-path-cell">${imp.file_path || ''}</td>
+        <td style="text-align:center;">${resCell}</td>
+        <td class="file-path-cell">${imp.file_path || imp.fetch_url || ''}</td>
         <td style="text-align: center;">${imp.triples_count > 0 ? imp.triples_count : ''}</td>
       </tr>
     `;
   }).join('');
-  
+
   return `
     <table class="imports-table">
       <thead>
         <tr>
           <th>Ontology URI</th>
-          <th>Source File</th>
+          <th>Via</th>
+          <th>Source</th>
           <th>Triples</th>
         </tr>
       </thead>
@@ -172,6 +185,7 @@ async function handleLoadResponse(response, source) {
       <strong>Base URI:</strong> ${response.base_uri}<br>
       <strong>Main file triples:</strong> ${response.triples_count}<br>
       ${response.total_graphs && response.total_triples ? `<strong>Total dataset:</strong> ${response.total_graphs} graphs, ${response.total_triples} triples` : ''}
+      ${response.uri_map_size != null ? `<br><strong>URI map:</strong> ${response.uri_map_size} entries indexed from uploaded directory` : ''}
     </div>
 
     <h3>Graph Statistics</h3>

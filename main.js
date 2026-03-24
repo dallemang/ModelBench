@@ -518,6 +518,7 @@ function onClassSearch(query) {
 
 // Make functions globally available for HTML onclick handlers
 window.loadFile = loadFile;
+window.loadDirectory = loadDirectory;
 window.loadFromUrl = loadFromUrl;
 window.closeDataset = closeDataset;
 window.toggleNode = toggleNode;

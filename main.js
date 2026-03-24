@@ -269,7 +269,10 @@ async function loadDirectory() {
     input.id = 'rdf-dir-input';
     input.setAttribute('webkitdirectory', '');
     input.setAttribute('multiple', '');
-    input.style.display = 'none';
+    input.style.position = 'fixed';
+    input.style.top = '-9999px';
+    input.style.left = '-9999px';
+    input.style.opacity = '0';
     document.body.appendChild(input);
   }
 

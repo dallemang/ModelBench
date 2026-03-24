@@ -267,8 +267,8 @@ async function loadDirectory() {
     input = document.createElement('input');
     input.type = 'file';
     input.id = 'rdf-dir-input';
-    input.webkitdirectory = true;
-    input.multiple = true;
+    input.setAttribute('webkitdirectory', '');
+    input.setAttribute('multiple', '');
     input.style.display = 'none';
     document.body.appendChild(input);
   }

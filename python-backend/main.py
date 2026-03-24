@@ -301,7 +301,7 @@ def extract_ontology_uri_from_file(file_path):
     try:
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read(50000)
-        # Turtle: <URI> a owl:Ontology  or  <URI> rdf:type owl:Ontology
+        # Turtle: <URI> a owl:Ontology  (full URI form)
         m = re.search(r'<([^>]+)>\s+(?:a\s+owl:Ontology|rdf:type\s+owl:Ontology)', content)
         if m:
             return m.group(1)
@@ -309,6 +309,11 @@ def extract_ontology_uri_from_file(file_path):
         m = re.search(r'<owl:Ontology[^>]*rdf:about=["\']([^"\']+)["\']', content)
         if m:
             return m.group(1)
+        # Turtle: <> a owl:Ontology  (relative URI — resolve against @base)
+        if re.search(r'<>\s+(?:a\s+owl:Ontology|rdf:type\s+owl:Ontology)', content):
+            base = scan_for_base_declaration(file_path)
+            if base:
+                return base.rstrip('/#')  # normalise trailing slash for lookup
     except Exception as e:
         print(f"Warning: could not extract ontology URI from {file_path}: {e}", file=sys.stderr)
     return None
@@ -318,14 +323,16 @@ def build_ontology_uri_map(temp_dir):
     """Scan all RDF files in temp_dir and return {ontology_uri → file_path}."""
     uri_map = {}
     rdf_extensions = {'.ttl', '.owl', '.rdf', '.n3', '.nt'}
+    scanned = 0
     for root, dirs, files in os.walk(temp_dir):
         for fname in files:
             if os.path.splitext(fname)[1].lower() in rdf_extensions:
                 fpath = os.path.join(root, fname)
+                scanned += 1
                 uri = extract_ontology_uri_from_file(fpath)
                 if uri:
                     uri_map[uri] = fpath
-    print(f"URI map: built {len(uri_map)} entries", file=sys.stderr)
+    print(f"URI map: scanned {scanned} RDF files, built {len(uri_map)} entries", file=sys.stderr)
     for uri, path in list(uri_map.items())[:5]:
         print(f"  URI map sample: {uri} → {os.path.basename(path)}", file=sys.stderr)
     return uri_map
@@ -350,6 +357,7 @@ def load_rdf_directory(temp_dir):
     result = load_rdf_file(entry_file, uri_map=uri_map)
     result['uri_map_size'] = len(uri_map)
     result['uri_map_sample'] = list(uri_map.keys())[:10]
+    result['entry_file'] = entry_file
     return result
 
 

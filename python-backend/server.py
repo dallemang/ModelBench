@@ -147,6 +147,7 @@ async def upload_directory_endpoint(
     """
     temp_dir = tempfile.mkdtemp()
     try:
+        print(f"upload_directory: received {len(files)} files, {len(paths)} paths", file=sys.stderr)
         for file, rel_path in zip(files, paths):
             dest = os.path.join(temp_dir, rel_path)
             os.makedirs(os.path.dirname(dest), exist_ok=True)

@@ -185,7 +185,7 @@ async function handleLoadResponse(response, source) {
       <strong>Base URI:</strong> ${response.base_uri}<br>
       <strong>Main file triples:</strong> ${response.triples_count}<br>
       ${response.total_graphs && response.total_triples ? `<strong>Total dataset:</strong> ${response.total_graphs} graphs, ${response.total_triples} triples` : ''}
-      ${response.uri_map_size != null ? `<br><strong>URI map:</strong> ${response.uri_map_size} entries indexed from uploaded directory` : ''}
+      ${response.uri_map_size != null ? `<br><strong>URI map:</strong> ${response.uri_map_size} entries indexed from uploaded directory${response.entry_file ? ` | entry: ${response.entry_file.split(/[\\/]/).pop()}` : ''}` : ''}
     </div>
 
     <h3>Graph Statistics</h3>

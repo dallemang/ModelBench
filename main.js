@@ -530,11 +530,37 @@ function onClassSearch(query) {
   resultsDiv.style.display = 'block';
 }
 
+let helpLoaded = false;
+
+async function showHelp() {
+  const overlay = document.getElementById('help-modal-overlay');
+  const body = document.getElementById('help-modal-body');
+  overlay.style.display = 'block';
+
+  if (!helpLoaded) {
+    try {
+      const res = await fetch('/HELP.md');
+      if (!res.ok) throw new Error(res.statusText);
+      const markdown = await res.text();
+      body.innerHTML = marked.parse(markdown);
+      helpLoaded = true;
+    } catch (error) {
+      body.innerHTML = `<p style="color: #dc3545;">Could not load help content: ${error}</p>`;
+    }
+  }
+}
+
+function closeHelp() {
+  document.getElementById('help-modal-overlay').style.display = 'none';
+}
+
 // Make functions globally available for HTML onclick handlers
 window.loadFile = loadFile;
 window.loadDirectory = loadDirectory;
 window.loadFromUrl = loadFromUrl;
 window.closeDataset = closeDataset;
+window.showHelp = showHelp;
+window.closeHelp = closeHelp;
 window.toggleNode = toggleNode;
 window.switchTab = switchTab;
 window.selectClass = selectClass;

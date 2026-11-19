@@ -35,6 +35,9 @@ from main import (
     load_rdf_directory,
     get_graph_info,
     query_graph,
+    get_class_instances,
+    get_resource_description,
+    get_resource_links,
     build_ontology_context_for_ai,
     clear_dataset
 )
@@ -228,6 +231,30 @@ def add_triple(request: AddTripleRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to add triple: {str(e)}")
+
+@app.get("/class_instances")
+def class_instances_endpoint(uri: str, offset: int = 0, limit: int = 25):
+    """Return one page of the direct instances of a class"""
+    result = get_class_instances(uri, offset, limit)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+@app.get("/resource")
+def resource_endpoint(uri: str):
+    """Describe one resource: types, outgoing statements, and incoming links"""
+    result = get_resource_description(uri)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+@app.get("/resource_links")
+def resource_links_endpoint(uri: str, limit: int = 100):
+    """Links to and from a resource (both directions), for the Explorer tab"""
+    result = get_resource_links(uri, max(1, min(limit, 1000)))
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
 
 @app.get("/hierarchy")
 def get_current_hierarchy():

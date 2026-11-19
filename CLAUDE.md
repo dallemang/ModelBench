@@ -1,77 +1,52 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. `AGENTS.md` carries the same content for other coding agents — keep the two in sync.
 
 ## Project Architecture
 
-This is a Tauri desktop application (product name: "OntoBench") with three main components:
-- **Frontend**: Vanilla JavaScript/HTML with Vite build system
-- **Rust Backend**: Tauri framework handling native desktop functionality
-- **Python Backend**: Standalone scripts for file processing
+OntoBench is a web application for viewing, exploring, and querying OWL/RDF ontologies:
+- **Frontend**: Vanilla JavaScript/HTML (`index.html`, `main.js`, `js/`) built with Vite. Talks to the backend with plain `fetch` calls (`js/api.js`), using relative URLs.
+- **Backend**: Python FastAPI server (`python-backend/server.py`) over rdflib (`python-backend/main.py`). Serves the API and, when `dist/` exists, the built frontend.
+- **Deployment**: `Dockerfile` builds the frontend and runs the backend on port 8000 (honours the `PORT` env var, e.g. on Railway).
 
-The app creates a simple desktop application with a file dialog interface. Users can load files through the File menu, which displays the selected file path in the UI.
+`src-tauri/` holds the original Tauri desktop shell. It is legacy: the frontend no longer calls any Tauri API, and the shell starts the backend on a random port the frontend never looks for. Don't treat `npm run tauri dev` as the way to run the app.
 
 ## Key Development Commands
 
-### Development
-```bash
-npm run tauri dev          # Start development server with hot reload
-npm run dev               # Start Vite dev server only (port 1420)
-```
-
-**IMPORTANT**: NEVER manually start the Python backend! Tauri automatically manages it.
-
-### Building
-```bash
-npm run tauri build       # Build production executable
-npm run build             # Build frontend only
-```
-
 ### Setup
 ```bash
-npm install                           # Install Node.js dependencies
-```
-
-#### Python Virtual Environment Setup (Windows)
-```powershell
-# Run the setup script to create venv and install dependencies
-.\setup-python.bat
-
-# Or manually:
-python -m venv python-backend\venv
-python-backend\venv\Scripts\activate
-pip install -r python-backend\requirements.txt
-```
-
-#### Python Virtual Environment Setup (Linux/Mac)
-```bash
+npm install
 python -m venv python-backend/venv
-source python-backend/venv/bin/activate
+source python-backend/venv/bin/activate        # Windows: python-backend\venv\Scripts\activate  (or .\setup-python.bat)
 pip install -r python-backend/requirements.txt
 ```
 
-## Architecture Details
+### Run (single server)
+```bash
+npm run build                        # builds the frontend into dist/
+python python-backend/server.py      # serves API + dist/ at http://localhost:8000 (optional port arg)
+```
 
-### Frontend (Vite + Vanilla JS)
-- Entry point: `index.html` with `main.js`
-- Uses Tauri API for native file dialogs (`@tauri-apps/plugin-dialog`)
-- Vite dev server runs on port 1420 (configured in `vite.config.js`)
+### Run (frontend hot reload)
+```bash
+python python-backend/server.py      # backend on :8000
+npm run dev                          # Vite on :1420, proxies API paths to :8000 (see vite.config.js)
+```
+Any new backend endpoint must also be added to the proxy list in `vite.config.js`, or it will 404 in dev mode.
 
-### Rust Backend (Tauri)
-- Main application in `src-tauri/src/lib.rs` with basic Tauri setup
-- Logging enabled in debug mode only
-- Window title: "OntoBench", default size 800x600
+### Docker
+```bash
+docker build -t ontobench .
+docker run -p 8000:8000 ontobench
+```
 
-### Python Backend
-- `python-backend/main.py` provides file processing utilities
-- Can be called with command line arguments for file operations
-- Currently has minimal dependencies (requirements.txt mostly empty)
+Run only one backend instance at a time — all state lives in that process (see below).
 
 ## CRITICAL ARCHITECTURE RULE - RDF Data Storage
 
-**SINGLE SOURCE OF TRUTH**: All RDF triple data is stored ONLY in `main.current_dataset` global variable in `python-backend/main.py`. 
+**SINGLE SOURCE OF TRUTH**: All RDF triple data is stored ONLY in `main.current_dataset` global variable in `python-backend/main.py`.
 
-**ZERO EXCEPTIONS**: 
+**ZERO EXCEPTIONS**:
 - NO triples are ever cached anywhere else in the system
 - ALL data access MUST go through `server.py` endpoints that reference `main.current_dataset`
 - To check if dataset is loaded, MUST call a function from `main.py` or use existing API endpoints
@@ -81,24 +56,14 @@ pip install -r python-backend/requirements.txt
 
 This architecture ensures data consistency and single source of truth for all RDF operations.
 
-## Python Backend Management
+## Loading and Import Resolution
 
-**CRITICAL**: The Python backend is automatically managed by Tauri. DO NOT start it manually!
+Three load paths, all ending in `load_imports_recursive()` in `main.py`:
+- `/upload_rdf` — single file from the browser, written to a temp file.
+- `/upload_directory` — whole folder; entry point must be `core/ontology.ttl`; every RDF file is indexed into a URI map (`build_ontology_uri_map`) keyed by `@base`, else the `owl:Ontology` subject.
+- `/load_rdf` — given an http(s) URI, delegates to `load_rdf_uri()` (Follow Your Nose).
 
-**How it works**:
-- Tauri auto-starts Python backend on a random available port when needed
-- Tauri manages the process lifecycle (starts, restarts if crashed, stops on exit)
-- All operations (file loading, AI, queries) use the same auto-managed backend instance
-- Frontend automatically detects the current backend port for AI operations
-
-**What NOT to do**:
-- ❌ `python server.py 8731` (manual start)
-- ❌ Running multiple Python backends simultaneously
-
-**What TO do**:
-- ✅ `npm run tauri dev` (starts everything including auto-managed Python backend)
-- ✅ Load files through UI (data goes to auto-managed backend)
-- ✅ Use AI features (connects to same backend with loaded data)
+Resolution order for each `owl:imports`: (0) URI map, (1) file relative to the importing file, (2) FYN over HTTP, (3) URL heuristic relative to where the importer was actually fetched from. Loads add to the existing dataset; `/clear_dataset` resets it. Known gaps are tracked in `wish.md`.
 
 ## Planned AI Features
 
@@ -112,14 +77,17 @@ This architecture ensures data consistency and single source of truth for all RD
 4. User can accept suggestion or discuss alternatives with AI
 5. Final relationship name is applied to the connection
 
-**Implementation notes**: 
+**Implementation notes**:
 - Will integrate with existing ontology editing workflow (separate from current AI chat tab)
 - Should use same AI infrastructure (providers, context building) but different UI integration point
 - AI context should include both classes' definitions, properties, and relationships for informed suggestions
 
 ## File Structure
-- `main.js` - Frontend logic and Tauri API integration
-- `src-tauri/` - Rust application code and Tauri configuration
-- `python-backend/` - Python scripts for backend processing
-- `dist/` - Built frontend assets (generated)
-- `src-tauri/target/` - Rust build artifacts (generated)
+- `index.html`, `main.js` - Frontend entry point and menu/load logic
+- `js/` - Frontend modules (API helpers, Cytoscape diagrams, ring layout, tree view, SPARQL, AI chat)
+- `public/` - Static assets copied into the build, including `HELP.md` (the in-app user guide)
+- `python-backend/server.py` - FastAPI endpoints; `main.py` - RDF loading/query logic; `hierarchy.py`; `ai_*.py` - AI providers/config
+- `examples/` - CDMC and FIBO 2025Q4 ontology suites
+- `wish.md` - Known gaps not yet fixed
+- `dist/` - Built frontend (generated)
+- `src-tauri/` - Legacy Tauri desktop shell (unused by the current frontend)

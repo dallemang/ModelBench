@@ -3,6 +3,7 @@
  */
 
 import { assignColorsToGraphs, getNodeColor } from './color-utils.js';
+import { apiGet } from './api.js';
 
 // Global state (will be managed by main.js)
 let classData = {};
@@ -10,6 +11,10 @@ let namespaces = {};
 let currentGraphColorMap = {};
 let currentRootNodeUris = new Set();
 let currentDescendantOfRootUris = new Set();
+
+// Navigation within the details panel (class -> instance -> linked resource ...)
+let navStack = [];      // previous views, most recent last: { type: 'class' | 'resource', uri }
+let currentView = null; // the view currently shown in the details panel
 
 /**
  * Set global state for tree operations
@@ -126,7 +131,9 @@ export function buildTreeHtml(nodes, graphColorMap, selectionType = 'class', roo
  * Select a class and show its details
  * @param {string} classUri - URI of the class to select
  */
-export function selectClass(classUri) {
+export function selectClass(classUri, fromNav = false) {
+  // A click in the tree (or anywhere outside panel navigation) starts a fresh path
+  if (!fromNav) navStack = [];
   console.log(`🎯 DEBUG: selectClass called with URI: ${classUri}`);
   
   // Remove selection from all labels
@@ -336,7 +343,7 @@ export function showClassDetails(classInfo) {
             // Check if this range is a class that exists in our class data
             const isClickableClass = classData[range.uri];
             if (isClickableClass) {
-              return `<a href="#" onclick="selectClass('${range.uri}'); return false;" style="color: #007bff; text-decoration: none;" title="Click to navigate to ${range.uri}">${range.label}</a>`;
+              return `<a href="#" onclick="openClassFromDetails(${jsArg(range.uri)}); return false;" style="color: #007bff; text-decoration: none;" title="Click to navigate to ${range.uri}">${range.label}</a>`;
             } else {
               return range.label;
             }
@@ -361,6 +368,7 @@ export function showClassDetails(classInfo) {
   }
   
   const classQname = uriToQname(classInfo.uri);
+  currentView = { type: 'class', uri: classInfo.uri };
   
   // Build annotations HTML
   let annotationsHtml = '';
@@ -411,15 +419,241 @@ export function showClassDetails(classInfo) {
   
   detailsContainer.innerHTML = `
     <div class="class-form active">
+      ${backBarHtml()}
       <h2 title="${classInfo.uri}">${classInfo.label}</h2>
       <div class="class-info">
         <p><strong>QName:</strong> <code style="word-break: break-all; font-size: 11px;" title="${classInfo.uri}">${classQname}</code></p>
         <h3>Properties</h3>
         ${propertiesHtml}
         ${annotationsHtml}
+        <h3>Instances</h3>
+        <div id="class-instances" data-class-uri="${escapeHtml(classInfo.uri)}">
+          <div class="property-values empty">Loading instances...</div>
+        </div>
       </div>
     </div>
   `;
+
+  loadClassInstancesPage(classInfo.uri, 0);
+}
+
+const INSTANCES_PAGE_SIZE = 25;
+
+/**
+ * Load one page of a class's instances into the "Instances" section of the class details panel.
+ * Ignores the response if the user has selected a different class in the meantime.
+ * @param {string} classUri - URI of the class
+ * @param {number} offset - Index of the first instance to show
+ */
+export async function loadClassInstancesPage(classUri, offset) {
+  const container = document.getElementById('class-instances');
+  if (!container || container.dataset.classUri !== classUri) return;
+
+  let data;
+  try {
+    data = await apiGet(`/class_instances?uri=${encodeURIComponent(classUri)}&offset=${offset}&limit=${INSTANCES_PAGE_SIZE}`);
+  } catch (error) {
+    if (container.isConnected && container.dataset.classUri === classUri) {
+      container.innerHTML = `<div class="property-values empty">Could not load instances: ${escapeHtml(String(error.message || error))}</div>`;
+    }
+    return;
+  }
+
+  // The panel may have moved on to another class while we were waiting
+  if (!container.isConnected || container.dataset.classUri !== classUri) return;
+
+  const blankNote = data.blank_node_count > 0
+    ? `<div style="font-size: 11px; color: #666; margin-top: 6px;">Plus ${data.blank_node_count.toLocaleString()} blank-node instance${data.blank_node_count === 1 ? '' : 's'} (not listed)</div>`
+    : '';
+
+  if (data.total === 0) {
+    container.innerHTML = `<div class="property-values empty">No instances of this class in the loaded data</div>${blankNote}`;
+    return;
+  }
+
+  const first = data.offset + 1;
+  const last = data.offset + data.instances.length;
+  const hasPrev = data.offset > 0;
+  const hasNext = last < data.total;
+  const uriArg = JSON.stringify(classUri).replace(/"/g, '&quot;');
+
+  const rows = data.instances.map(inst => {
+    const qname = uriToQname(inst.uri);
+    const label = `<a href="#" onclick="openResource(${jsArg(inst.uri)}); return false;" style="color: #007bff; text-decoration: none;">${escapeHtml(inst.label)}</a>`;
+    const qnameHtml = qname !== inst.label
+      ? ` <span style="font-size: 11px; color: #666; margin-left: 8px;">${escapeHtml(qname)}</span>`
+      : '';
+    return `<li style="padding: 3px 0; word-break: break-all;" title="${escapeHtml(inst.uri)}">${label}${qnameHtml}</li>`;
+  }).join('');
+
+  const pager = data.total > data.limit ? `
+    <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+      <button ${hasPrev ? '' : 'disabled'} onclick="loadClassInstancesPage(${uriArg}, ${Math.max(0, data.offset - data.limit)})">&laquo; Prev</button>
+      <span style="font-size: 12px; color: #444;">${first.toLocaleString()}&ndash;${last.toLocaleString()} of ${data.total.toLocaleString()}</span>
+      <button ${hasNext ? '' : 'disabled'} onclick="loadClassInstancesPage(${uriArg}, ${data.offset + data.limit})">Next &raquo;</button>
+    </div>` : `<div style="font-size: 12px; color: #444; margin-top: 6px;">${data.total.toLocaleString()} instance${data.total === 1 ? '' : 's'}</div>`;
+
+  container.innerHTML = `
+    <ul style="list-style: none; padding: 8px 12px; margin: 0; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #007bff;">${rows}</ul>
+    ${pager}
+    ${blankNote}
+  `;
+}
+
+/**
+ * Quote a value for use as a JavaScript argument inside an HTML onclick attribute.
+ */
+function jsArg(value) {
+  return JSON.stringify(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+function backBarHtml() {
+  if (navStack.length === 0) return '';
+  const prev = navStack[navStack.length - 1];
+  const prevLabel = prev.type === 'class' && classData[prev.uri] ? classData[prev.uri].label : uriToQname(prev.uri);
+  return `<div style="margin-bottom: 10px;"><button onclick="navigateBack()" title="${escapeHtml(prev.uri)}">&larr; Back to ${escapeHtml(prevLabel)}</button></div>`;
+}
+
+/**
+ * Open a class from a link inside the details panel, remembering where we came from.
+ */
+export function openClassFromDetails(classUri) {
+  if (currentView) navStack.push(currentView);
+  selectClass(classUri, true);
+}
+
+/**
+ * Open a resource (instance or any linked URI) from a link inside the details panel.
+ */
+export function openResource(resourceUri) {
+  if (currentView) navStack.push(currentView);
+  showResourceDetails(resourceUri);
+}
+
+/**
+ * Return to the previous view in the details panel.
+ */
+export function navigateBack() {
+  const prev = navStack.pop();
+  if (!prev) return;
+  if (prev.type === 'class') {
+    selectClass(prev.uri, true);
+  } else {
+    showResourceDetails(prev.uri);
+  }
+}
+
+/**
+ * Render one RDF term from the /resource endpoint.
+ * URIs that are known classes open the class view; other URIs open the resource view.
+ */
+function renderTerm(term, depth = 0) {
+  if (term.kind === 'literal') {
+    let tag = '';
+    if (term.lang) {
+      tag = `<span style="font-size: 11px; color: #666; margin-left: 6px;">@${escapeHtml(term.lang)}</span>`;
+    } else if (term.datatype && !term.datatype.endsWith('#string')) {
+      tag = `<span style="font-size: 11px; color: #666; margin-left: 6px;">${escapeHtml(uriToQname(term.datatype))}</span>`;
+    }
+    return `<span style="white-space: pre-wrap;">${escapeHtml(term.value)}</span>${tag}`;
+  }
+  if (term.kind === 'bnode') {
+    if (!term.properties || term.properties.length === 0 || depth > 0) {
+      return `<span style="color: #666; font-style: italic;">[blank node]</span>`;
+    }
+    const rows = term.properties.map(prop => `
+      <div style="margin: 2px 0;">
+        <span style="color: #444;" title="${escapeHtml(prop.predicate)}">${escapeHtml(prop.predicate_label)}:</span>
+        ${prop.values.map(v => renderTerm(v, depth + 1)).join(', ')}
+      </div>`).join('');
+    return `<div style="margin: 4px 0 4px 4px; padding: 4px 8px; border-left: 2px solid #ccc;">${rows}</div>`;
+  }
+  // URI
+  const qname = uriToQname(term.value);
+  const isClass = !!classData[term.value];
+  const handler = isClass ? 'openClassFromDetails' : 'openResource';
+  const qnameHtml = qname !== term.label
+    ? ` <span style="font-size: 11px; color: #666; margin-left: 6px;">${escapeHtml(qname)}</span>`
+    : '';
+  const external = /^https?:/.test(term.value)
+    ? ` <a href="${escapeHtml(term.value)}" target="_blank" rel="noopener" title="Open ${escapeHtml(term.value)} in a new tab" style="text-decoration: none; font-size: 11px; color: #888;">&#8599;</a>`
+    : '';
+  return `<a href="#" onclick="${handler}(${jsArg(term.value)}); return false;" title="${escapeHtml(term.value)}" style="color: #007bff; text-decoration: none;">${escapeHtml(term.label)}</a>${qnameHtml}${external}`;
+}
+
+/**
+ * Show a resource (typically an instance) in the details panel: types, properties, incoming links.
+ * @param {string} resourceUri - URI of the resource
+ */
+export async function showResourceDetails(resourceUri) {
+  const detailsContainer = document.getElementById('class-details');
+  currentView = { type: 'resource', uri: resourceUri };
+  detailsContainer.innerHTML = `
+    <div class="class-form active">
+      ${backBarHtml()}
+      <h2 title="${escapeHtml(resourceUri)}">${escapeHtml(uriToQname(resourceUri))}</h2>
+      <div class="property-values empty">Loading...</div>
+    </div>`;
+
+  let data;
+  try {
+    data = await apiGet(`/resource?uri=${encodeURIComponent(resourceUri)}`);
+  } catch (error) {
+    if (currentView && currentView.uri === resourceUri) {
+      detailsContainer.querySelector('.property-values').textContent = `Could not load resource: ${error.message || error}`;
+    }
+    return;
+  }
+  // The user may have navigated elsewhere while we were waiting
+  if (!currentView || currentView.type !== 'resource' || currentView.uri !== resourceUri) return;
+
+  const valueBox = inner => `<div class="annotation-values" style="margin-left: 20px; padding: 8px; background: #f8f9fa; border-radius: 4px; border-left: 3px solid #007bff;">${inner}</div>`;
+
+  const typesHtml = data.types.length
+    ? valueBox(data.types.map(t => `<div style="margin-bottom: 3px;">${renderTerm(t)}</div>`).join(''))
+    : `<div class="property-values empty">No rdf:type in the loaded data</div>`;
+
+  const propsHtml = data.properties.length
+    ? data.properties.map(prop => {
+        const more = prop.total > prop.values.length
+          ? `<div style="font-size: 11px; color: #666; margin-top: 4px;">&hellip; and ${(prop.total - prop.values.length).toLocaleString()} more (use the SPARQL tab to see all)</div>`
+          : '';
+        return `
+          <div class="annotation-group" style="margin-bottom: 12px;">
+            <div class="annotation-property" style="font-weight: bold; margin-bottom: 4px;" title="${escapeHtml(prop.predicate)}">
+              ${escapeHtml(prop.predicate_label)} <span style="font-size: 11px; color: #666; font-weight: normal; margin-left: 6px;">${escapeHtml(uriToQname(prop.predicate))}</span>
+            </div>
+            ${valueBox(prop.values.map(v => `<div style="margin-bottom: 3px;">${renderTerm(v)}</div>`).join('') + more)}
+          </div>`;
+      }).join('')
+    : `<div class="property-values empty">No statements about this resource in the loaded data</div>`;
+
+  const incomingMore = data.incoming_total > data.incoming.length
+    ? `<div style="font-size: 11px; color: #666; margin-top: 4px;">Showing ${data.incoming.length} of ${data.incoming_total.toLocaleString()} (use the SPARQL tab to see all)</div>`
+    : '';
+  const incomingHtml = data.incoming_total
+    ? valueBox(data.incoming.map(link => `
+        <div style="margin-bottom: 3px;">${renderTerm(link.subject, 1)}
+          <span style="font-size: 11px; color: #666; margin-left: 6px;" title="${escapeHtml(link.predicate)}">${escapeHtml(link.predicate_label)}</span>
+        </div>`).join('') + incomingMore)
+    : `<div class="property-values empty">Nothing in the loaded data points to this resource</div>`;
+
+  const qname = uriToQname(resourceUri);
+  detailsContainer.innerHTML = `
+    <div class="class-form active">
+      ${backBarHtml()}
+      <h2 title="${escapeHtml(resourceUri)}">${escapeHtml(data.label)}</h2>
+      <div style="margin-bottom: 10px;"><button onclick="openInExplorer(${jsArg(resourceUri)})">Open in Explorer</button></div>
+      <div class="class-info">
+        <p><strong>${qname !== resourceUri ? 'QName' : 'URI'}:</strong> <code style="word-break: break-all; font-size: 11px;" title="${escapeHtml(resourceUri)}">${escapeHtml(qname)}</code></p>
+        <h3>Types</h3>
+        ${typesHtml}
+        <h3>Properties</h3>
+        ${propsHtml}
+        <h3>Referenced by</h3>
+        ${incomingHtml}
+      </div>
+    </div>`;
 }
 
 export function showOntologyDetails(ontologyInfo) {

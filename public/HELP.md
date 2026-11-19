@@ -6,9 +6,11 @@ Everything starts from the **File** menu.
 
 ## Load file...
 
-Loads a single RDF file. Accepted extensions: `.ttl`, `.rdf`, `.owl`, `.n3`, `.nt`.
+Uploads a single RDF file. Accepted extensions: `.ttl`, `.rdf`, `.owl`, `.n3`, `.nt`.
 
-Use this for a self-contained ontology that doesn't `owl:import` other files, or when you only care about one file in isolation. Any `owl:imports` statements in the file will be listed, but the imported ontologies themselves won't be loaded — there's nothing else on disk for OntoBench to find them in.
+Only that one file is sent to OntoBench, so imports can't be resolved against other files on your disk. Any `owl:imports` that point at web (http/https) URIs are still fetched live, the same way **Load from URL...** does it, as long as OntoBench has internet access. Imports that can't be found are listed in the Imports tab with their status.
+
+Use this for a self-contained ontology, or for one whose imports are published on the web.
 
 ## Load directory...
 
@@ -33,11 +35,19 @@ Once it finds the entry point, OntoBench scans every `.ttl`, `.owl`, `.rdf`, `.n
 
 If your ontology isn't organized this way, either:
 - Restructure so one file sits at `<folder>/core/ontology.ttl`, with everything else it imports elsewhere in the same tree, or
-- Upload just the one file you care about via **Load file...** instead (cross-file imports won't resolve).
+- Upload just the one file you care about via **Load file...** instead (local cross-file imports won't resolve; web imports still will).
+
+**Known limitations:** files are matched by their `@base` / `owl:Ontology` URI only, not by `owl:versionIRI`. An import that names a versioned IRI misses the local map and falls back to fetching from the web. A file with neither `@base` nor an `owl:Ontology` declaration can't be reached via `owl:imports` at all.
 
 ## Load from URL...
 
-Prompts for a URI and fetches an RDF ontology directly from the web. Use this for ontologies published at a stable URL (e.g. a published vocabulary). Only the single fetched document is loaded — the same import limitation as **Load file...** applies.
+Prompts for a URI and fetches an RDF ontology directly from the web, then follows its `owl:imports` recursively ("Follow Your Nose"). Each import URI is requested with RDF content negotiation. If a server answers with HTML instead of RDF, OntoBench tries to find the import relative to the URL the importing file actually came from. This is how a GitHub raw copy like `https://raw.githubusercontent.com/edmcouncil/cdmc/refs/heads/main/ontology/AboutCDMC.ttl` pulls in its sibling files.
+
+Large suites can trigger hundreds of downloads; full FIBO takes several minutes.
+
+## Loading more than one thing
+
+Each load adds to whatever is already loaded; it doesn't replace it. Use **Clear** first if you want a fresh start.
 
 ## Clear
 

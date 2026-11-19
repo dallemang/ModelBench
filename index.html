@@ -385,6 +385,55 @@
         height: 100%;
       }
       
+      /* Explorer Tab Styles */
+      #explorer-panel {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      #explorer-toolbar {
+        padding: 10px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #ddd;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+      #explorer-toolbar button {
+        padding: 6px 12px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      #explorer-toolbar button:hover {
+        background: #0056b3;
+      }
+      #explorer-toolbar .explorer-hint {
+        font-size: 12px;
+        color: #666;
+      }
+      #explorer-status {
+        font-size: 13px;
+        padding: 0 10px;
+        min-height: 0;
+      }
+      #explorer-status:not(:empty) {
+        padding: 6px 10px;
+        border-bottom: 1px solid #eee;
+      }
+      #explorer-container {
+        flex: 1;
+        min-height: 500px;
+        background: #fff;
+        border: 1px solid #ddd;
+      }
+      .tab-pane.diagram-active #explorer-panel {
+        height: 100%;
+      }
+
       /* AI Interface Styles */
       #ai-provider-select, #ai-model-select {
         width: 100%;
@@ -728,6 +777,7 @@
           <button class="tab-button" onclick="switchTab('import-hierarchy')">Import Hierarchy</button>
           <button class="tab-button" onclick="switchTab('imports-table')">Import Details</button>
           <button class="tab-button" onclick="switchTab('diagram')">Class Diagram</button>
+          <button class="tab-button" onclick="switchTab('explorer')">Explorer</button>
           <button class="tab-button" onclick="switchTab('query')">SPARQL Query</button>
           <button class="tab-button" onclick="switchTab('ai')">AI Assistant</button>
           <button class="tab-button" onclick="switchTab('log')">Log</button>
@@ -803,6 +853,19 @@
               </div>
               <div id="diagram-legend"></div>
               <div id="cytoscape-container"></div>
+            </div>
+          </div>
+
+          <!-- Explorer Tab -->
+          <div id="tab-explorer" class="tab-pane">
+            <div id="explorer-panel">
+              <div id="explorer-toolbar">
+                <button onclick="fitExplorer()">Fit to Screen</button>
+                <button onclick="clearExplorer()">Clear</button>
+                <span class="explorer-hint">Double-click a node to expand or collapse its links (both directions; arrows show which way). Add resources with "Open in Explorer" on an instance's details.</span>
+              </div>
+              <div id="explorer-status"></div>
+              <div id="explorer-container"></div>
             </div>
           </div>
 

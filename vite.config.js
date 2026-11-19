@@ -13,6 +13,12 @@ export default defineConfig(async () => ({
       '/api': { target: 'http://localhost:8000', rewrite: path => path.replace(/^\/api/, '') },
       '/load_rdf': 'http://localhost:8000',
       '/upload_rdf': 'http://localhost:8000',
+      '/upload_directory': 'http://localhost:8000',
+      '/class_instances': 'http://localhost:8000',
+      '/resource': 'http://localhost:8000',
+      '/resource_links': 'http://localhost:8000',
+      '/dump': 'http://localhost:8000',
+      '/resolve_import_path': 'http://localhost:8000',
       '/graph_info': 'http://localhost:8000',
       '/clear_dataset': 'http://localhost:8000',
       '/hierarchy': 'http://localhost:8000',
@@ -23,4 +29,4 @@ export default defineConfig(async () => ({
       '/health': 'http://localhost:8000',
     },
   },
-}));
+}));

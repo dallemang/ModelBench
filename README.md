@@ -1,14 +1,14 @@
 # OntoBench
 
-A desktop application for viewing, exploring, and querying OWL/RDF ontologies. OntoBench loads ontology files, automatically resolves their imports, and provides interactive visualizations, SPARQL querying, and AI-assisted exploration.
+A web application for viewing, exploring, and querying OWL/RDF ontologies. OntoBench loads ontology files, automatically resolves their imports, and provides interactive visualizations, SPARQL querying, and AI-assisted exploration.
 
 ## Getting Started
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18+)
 - [Python](https://www.python.org/) (3.10+)
-- [Rust](https://www.rust-lang.org/tools/install) (for Tauri)
+- [Node.js](https://nodejs.org/) (v18+), to build the frontend
+- [Docker](https://www.docker.com/), optional
 
 ### Setup
 
@@ -33,58 +33,64 @@ A desktop application for viewing, exploring, and querying OWL/RDF ontologies. O
 
 ### Running
 
-```bash
-npm run tauri dev
-```
-
-This starts everything: the Vite dev server, the Tauri desktop shell, and the Python backend. The Python backend is managed automatically by Tauri -- do not start it manually.
-
-### Building
+**Single server:** build the frontend, then let the backend serve it:
 
 ```bash
-npm run tauri build
+npm run build
+python python-backend/server.py
 ```
 
-Produces a standalone desktop executable.
+Open http://localhost:8000. Pass a different port as an argument or set `PORT`.
+
+**Frontend development with hot reload:** run the backend and the Vite dev server side by side:
+
+```bash
+python python-backend/server.py   # backend on :8000
+npm run dev                       # http://localhost:1420, proxies API calls to :8000
+```
+
+**Docker:**
+
+```bash
+docker build -t ontobench .
+docker run -p 8000:8000 ontobench
+```
+
+> `src-tauri/` contains the original Tauri desktop shell. The current frontend no longer uses it, so `npm run tauri dev` is not a supported way to run OntoBench.
+
+## Loading Ontologies
+
+The **File** menu has three ways in. See **Help > User Guide** in the app for details.
+
+- **Load file...** uploads one file. Imports that point at web URIs are fetched live; imports of other local files are not, because only the one file is uploaded.
+- **Load directory...** uploads a folder and resolves `owl:imports` between its files by ontology URI. The folder must contain `core/ontology.ttl` as the entry point.
+- **Load from URL...** fetches an ontology from the web and recursively follows all its `owl:imports` ("Follow Your Nose").
+
+Loads accumulate; use **File > Clear** to start over.
 
 ## Example Ontologies
 
-The `examples/CDMC/` directory contains the EDM Council's Cloud Data Management Capabilities (CDMC) ontology suite -- 10 interconnected ontology files. To try it:
+The `examples/CDMC/` directory contains the EDM Council's Cloud Data Management Capabilities (CDMC) ontology suite, 10 interconnected ontology files. `examples/FIBO_2025Q4/` contains the Financial Industry Business Ontology (FIBO) Production release, 220 interconnected files covering business entities, financial instruments, derivatives, indices, and more.
 
-1. Launch OntoBench
-2. Use **File > Open** and select `examples/CDMC/AboutCDMC.ttl`
-3. OntoBench will automatically discover and load all 9 imported ontologies from the same directory
+Neither example folder has a `core/ontology.ttl` yet, so **Load directory...** won't accept them as-is. To load a whole local suite offline, add a `core/ontology.ttl` inside the folder that `owl:imports` the suite's top ontology (e.g. the URI declared in `AboutCDMC.ttl` or `AboutFIBOProd.ttl`).
 
-The `examples/FIBO_2025Q4/` directory contains the EDM Council's Financial Industry Business Ontology (FIBO) Production release -- 220 interconnected ontology files covering business entities, financial instruments, derivatives, indices, and more. To try it:
+The easiest way to try them is to load them live:
 
-1. Launch OntoBench
-2. Use **File > Open** and select `examples/FIBO_2025Q4/AboutFIBOProd.ttl`
-3. OntoBench will recursively discover and load all imported ontologies
+- **CDMC:** **Load from URL...** with
+  `https://raw.githubusercontent.com/edmcouncil/cdmc/refs/heads/main/ontology/AboutCDMC.ttl`.
+  CDMC's own URIs return HTML rather than RDF, so OntoBench resolves each import relative to the GitHub raw URL instead.
+- **FIBO subset (recommended to start):** `https://spec.edmcouncil.org/fibo/ontology/BE/SoleProprietorships/SoleProprietorships/`
+- **FIBO full production release:** `https://spec.edmcouncil.org/fibo/ontology/AboutFIBOProd/`
 
-**Warning:** FIBO is vastly larger and more complex than CDMC. Expect the visualization to be dense and harder to navigate -- the ring layout works best with smaller ontology suites. SPARQL queries and the tree view are more practical ways to explore FIBO.
+**Load file...** on a single FIBO file such as `examples/FIBO_2025Q4/BE/SoleProprietorships/SoleProprietorships.ttl` also works when you're online. FIBO serves RDF by content negotiation, so its imports are fetched from spec.edmcouncil.org rather than from the local copies.
 
-For a more manageable subset, try loading a single FIBO module such as `examples/FIBO_2025Q4/BE/SoleProprietorships/SoleProprietorships.ttl` -- OntoBench will pull in only its direct imports, giving you a smaller, more readable diagram.
-
-### Follow Your Nose (live web loading)
-
-OntoBench also supports loading ontologies directly from the web. Use **File > Load from URL...** and enter an ontology URI -- OntoBench will fetch it and recursively follow all `owl:imports` links automatically.
-
-FIBO publishes its ontologies as linked data, so you can load it live without the local example files:
-
-- **Subset (recommended to start):** `https://spec.edmcouncil.org/fibo/ontology/BE/SoleProprietorships/SoleProprietorships/`
-- **Full production release:** `https://spec.edmcouncil.org/fibo/ontology/AboutFIBOProd/`
-
-**Warning:** Loading the full FIBO via Follow Your Nose will trigger hundreds of individual HTTP downloads and may take several minutes to complete. Start with the subset URI to get a feel for the feature.
-
-When a server returns HTML instead of RDF (i.e. doesn't support content negotiation), OntoBench falls back to a FYN heuristic that tries to resolve imports relative to the original fetch URL. This works in some cases -- CDMC is one of them. Load it live with:
-
-`https://raw.githubusercontent.com/edmcouncil/cdmc/refs/heads/main/ontology/AboutCDMC.ttl`
+**Warning:** FIBO is vastly larger and more complex than CDMC. Loading all of it triggers hundreds of HTTP downloads and may take several minutes. The resulting diagram is dense; the ring layout works best with smaller suites, and SPARQL queries and the tree view are more practical ways to explore FIBO.
 
 ## Features
 
 ### Automatic Import Resolution
 
-When you load an ontology that declares `owl:imports`, OntoBench automatically finds and loads the imported ontologies if they are in the same directory structure. It resolves relative paths, tries common file extensions (`.ttl`, `.rdf`, `.owl`), and tracks the status of each import (loaded, already loaded, not found, error). The Import Hierarchy tab shows the full import tree with status indicators.
+When you load an ontology that declares `owl:imports`, OntoBench finds and loads each import in this order: a matching file from an uploaded directory (by ontology URI), a file relative to the importing file, a live HTTP fetch of the import URI, and finally a URL relative to where the importing file was fetched from. Each import's status (loaded, fetched, already loaded, not found, fetch failed, error) and how it was resolved appear in the Import Hierarchy tab. Known gaps are listed in `wish.md`.
 
 ### Ring-Based Ontology Visualization
 

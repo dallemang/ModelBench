@@ -1,8 +1,9 @@
 import { apiGet, apiPost, apiUpload, BACKEND } from './js/api.js';
 import { createClassDiagram, resetViewportState } from './js/cytoscape-renderer.js';
 import { switchTab, resetLayout, fitToScreen, debugDiagramData, setLayoutType, setHierarchyData, getCurrentLayoutType, toggleDark } from './js/ui-controls.js';
-import { buildTreeHtml, selectClass, selectOntology, toggleNode, setTreeState, getClassData, getNamespaces, countClasses } from './js/tree-builder.js';
+import { buildTreeHtml, selectClass, loadClassInstancesPage, openResource, openClassFromDetails, navigateBack, selectOntology, toggleNode, setTreeState, getClassData, getNamespaces, countClasses } from './js/tree-builder.js';
 import { assignColorsToGraphs } from './js/color-utils.js';
+import { openInExplorer, fitExplorer, clearExplorer } from './js/explorer.js';
 
 // Helper function to render import details recursively
 function renderImportDetails(imports, level = 0) {
@@ -383,6 +384,7 @@ async function closeDataset() {
       
       // Clear all tab content
       document.getElementById('hierarchy-tree').innerHTML = '';
+      clearExplorer();
       document.getElementById('import-hierarchy-tree').innerHTML = '';
       document.getElementById('class-details').innerHTML = `
         <div class="no-selection">
@@ -564,6 +566,18 @@ window.closeHelp = closeHelp;
 window.toggleNode = toggleNode;
 window.switchTab = switchTab;
 window.selectClass = selectClass;
+window.loadClassInstancesPage = loadClassInstancesPage;
+window.openResource = openResource;
+window.openClassFromDetails = openClassFromDetails;
+window.navigateBack = navigateBack;
+window.openInExplorer = openInExplorer;
+window.fitExplorer = fitExplorer;
+window.clearExplorer = clearExplorer;
+// "Details" button in the Explorer status bar: show the resource in the Class Hierarchy panel
+window.showExplorerNodeDetails = (uri) => {
+  switchTab('hierarchy');
+  openResource(uri);
+};
 window.selectOntology = selectOntology;
 window.resetDiagramLayout = resetLayout;
 window.fitDiagram = fitToScreen;

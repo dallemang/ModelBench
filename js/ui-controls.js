@@ -3,6 +3,7 @@
  */
 
 import { getCytoscapeInstance, resetDiagramLayout, fitDiagram, createClassDiagram, toggleDarkMode } from './cytoscape-renderer.js';
+import { onExplorerShown } from './explorer.js';
 
 /**
  * Switch between tabs
@@ -45,6 +46,13 @@ export function switchTab(tabName) {
     }
   }
   
+  // The Explorer is full size like the diagram
+  if (tabName === 'explorer') {
+    activePane.classList.add('diagram-active');
+    document.querySelector('.tab-content').classList.add('diagram-active');
+    onExplorerShown();
+  }
+
   // If switching to AI tab, initialize AI interface
   if (tabName === 'ai' && window.initAI && !window.aiInitialized) {
     setTimeout(() => {

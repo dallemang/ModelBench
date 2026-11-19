@@ -9,13 +9,14 @@ import os
 import re
 import uuid
 from rdflib import Graph, Dataset, URIRef, Literal, BNode
-from rdflib.namespace import RDF, RDFS, OWL
+from rdflib.namespace import RDF, RDFS, OWL, SKOS
 
 # Import hierarchy building functions
 from hierarchy import (
     build_class_hierarchy_from_dataset,
     build_import_hierarchy_from_dataset,
-    get_label
+    get_label,
+    get_label_from_dataset
 )
 
 # Global dataset storage
@@ -897,6 +898,192 @@ def load_rdf_file(file_path, uri_map=None):
         
     except Exception as e:
         return {"error": f"Failed to load RDF file: {str(e)}"}
+
+def get_class_instances(class_uri, offset=0, limit=25):
+    """Return one page of the direct instances (rdf:type) of a class, across all graphs.
+
+    Instances are sorted by label (then URI) so pages are stable. Blank-node
+    instances are counted separately and not listed, since they can't be
+    identified or navigated to.
+    """
+    global current_dataset
+
+    if current_dataset is None:
+        return {"error": "No dataset currently loaded"}
+
+    offset = max(0, int(offset))
+    limit = max(1, min(int(limit), 500))
+
+    cls = URIRef(class_uri)
+    named = set()
+    blanks = set()
+    for s, _, _, _ in current_dataset.quads((None, RDF.type, cls, None)):
+        (blanks if isinstance(s, BNode) else named).add(s)
+
+    labelled = [(get_label_from_dataset(current_dataset, s), str(s)) for s in named]
+    labelled.sort(key=lambda t: (t[0].casefold(), t[1]))
+    page = labelled[offset:offset + limit]
+
+    return {
+        "class_uri": class_uri,
+        "total": len(labelled),
+        "blank_node_count": len(blanks),
+        "offset": offset,
+        "limit": limit,
+        "instances": [{"uri": uri, "label": label} for label, uri in page],
+    }
+
+def _describe_term(term):
+    """JSON-friendly description of an RDF term (used by get_resource_description)."""
+    if isinstance(term, Literal):
+        return {
+            "kind": "literal",
+            "value": str(term),
+            "lang": term.language,
+            "datatype": str(term.datatype) if term.datatype else None,
+        }
+    if isinstance(term, BNode):
+        return {"kind": "bnode", "value": str(term)}
+    return {"kind": "uri", "value": str(term), "label": get_label_from_dataset(current_dataset, term)}
+
+def get_resource_description(resource_uri, value_limit=200, incoming_limit=50):
+    """Describe a resource from all graphs: its types, outgoing statements, and incoming links.
+
+    Outgoing values are grouped by predicate and capped at value_limit per predicate.
+    Blank-node values are expanded one level so restrictions, addresses and the like
+    are readable. Incoming links are capped at incoming_limit (total is reported).
+    """
+    global current_dataset
+
+    if current_dataset is None:
+        return {"error": "No dataset currently loaded"}
+
+    res = URIRef(resource_uri)
+
+    # Outgoing statements, de-duplicated across graphs
+    outgoing = {}
+    for _, p, o, _ in current_dataset.quads((res, None, None, None)):
+        outgoing.setdefault(p, set()).add(o)
+
+    def expand_bnode(bnode):
+        props = {}
+        for _, p, o, _ in current_dataset.quads((bnode, None, None, None)):
+            props.setdefault(p, set()).add(o)
+        return [
+            {"predicate": str(p), "predicate_label": get_label_from_dataset(current_dataset, p),
+             "values": [_describe_term(o) for o in sorted(vals, key=str)]}
+            for p, vals in sorted(props.items(), key=lambda kv: str(kv[0]))
+        ]
+
+    types = [_describe_term(t) for t in sorted(outgoing.pop(RDF.type, set()), key=str)]
+
+    properties = []
+    for p, vals in outgoing.items():
+        ordered = sorted(vals, key=lambda v: (not isinstance(v, Literal), str(v)))
+        values = []
+        for o in ordered[:value_limit]:
+            d = _describe_term(o)
+            if d["kind"] == "bnode":
+                d["properties"] = expand_bnode(o)
+            values.append(d)
+        properties.append({
+            "predicate": str(p),
+            "predicate_label": get_label_from_dataset(current_dataset, p),
+            "total": len(vals),
+            "values": values,
+        })
+    properties.sort(key=lambda prop: (prop["predicate_label"].casefold(), prop["predicate"]))
+
+    # Incoming links, de-duplicated across graphs
+    incoming = set()
+    for s, p, _, _ in current_dataset.quads((None, None, res, None)):
+        incoming.add((s, p))
+    incoming_list = sorted(incoming, key=lambda sp: (isinstance(sp[0], BNode), str(sp[1]), str(sp[0])))
+
+    return {
+        "uri": resource_uri,
+        "label": get_label_from_dataset(current_dataset, res),
+        "types": types,
+        "properties": properties,
+        "incoming_total": len(incoming_list),
+        "incoming": [
+            {"subject": _describe_term(s), "predicate": str(p),
+             "predicate_label": get_label_from_dataset(current_dataset, p)}
+            for s, p in incoming_list[:incoming_limit]
+        ],
+    }
+
+def get_print_name(resource):
+    """Human-readable name for a resource: rdfs:label, then skos:prefLabel, then local name.
+
+    Among several labels, prefers English, then untagged, then any other language.
+    """
+    def pick(predicate):
+        best = None
+        for _, _, label, _ in current_dataset.quads((resource, predicate, None, None)):
+            if not isinstance(label, Literal):
+                continue
+            lang = (label.language or '').lower()
+            rank = 0 if lang.startswith('en') else 1 if lang == '' else 2
+            if best is None or rank < best[0]:
+                best = (rank, str(label))
+        return best[1] if best else None
+
+    name = pick(RDFS.label) or pick(SKOS.prefLabel)
+    if name:
+        return name
+    uri_str = str(resource)
+    local = re.split(r'[#/]', uri_str.rstrip('/#'))[-1]
+    return local or uri_str
+
+def get_resource_links(resource_uri, limit=100):
+    """Links between a resource and other named resources, in both directions, for the Explorer.
+
+    Outbound links are triples (resource, p, target); inbound links are (source, p, resource).
+    rdf:type is excluded both ways (so expanding a class doesn't pull in all its instances),
+    as are literal and blank-node ends. Each direction is capped at `limit`; totals are reported.
+    Every link is returned as a full triple (subject/predicate/object) with print names.
+    """
+    global current_dataset
+
+    if current_dataset is None:
+        return {"error": "No dataset currently loaded"}
+
+    res = URIRef(resource_uri)
+    outbound = set()
+    for _, p, o, _ in current_dataset.quads((res, None, None, None)):
+        if p != RDF.type and isinstance(o, URIRef):
+            outbound.add((p, o))
+    inbound = set()
+    for s, p, _, _ in current_dataset.quads((None, None, res, None)):
+        if p != RDF.type and isinstance(s, URIRef):
+            inbound.add((s, p))
+
+    names = {}
+    def name(term):
+        if term not in names:
+            names[term] = get_print_name(term)
+        return names[term]
+
+    out_sorted = sorted(outbound, key=lambda po: (name(po[0]).casefold(), name(po[1]).casefold(), str(po[1])))
+    in_sorted = sorted(inbound, key=lambda sp: (name(sp[1]).casefold(), name(sp[0]).casefold(), str(sp[0])))
+
+    def link(s, p, o, direction):
+        return {
+            "direction": direction,
+            "subject": str(s), "subject_label": name(s),
+            "predicate": str(p), "predicate_label": name(p),
+            "object": str(o), "object_label": name(o),
+        }
+
+    return {
+        "uri": resource_uri,
+        "label": name(res),
+        "outbound_total": len(out_sorted),
+        "inbound_total": len(in_sorted),
+        "links": [link(res, p, o, "out") for p, o in out_sorted[:limit]]
+               + [link(s, p, res, "in") for s, p in in_sorted[:limit]],
+    }
 
 def get_graph_info():
     """Get information about the currently loaded dataset"""
